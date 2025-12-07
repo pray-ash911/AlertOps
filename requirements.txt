@@ -1,0 +1,10 @@
+Django
+djangorestframework
+streamlit
+ultralytics
+opencv-python
+torch
+torchvision
+Pillow
+psycopg2-binary
+numpy
