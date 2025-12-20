@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 # --- Choices for Event Status ---
 EVENT_STATUS_CHOICES = [
@@ -37,6 +38,14 @@ class SurveillanceArea(models.Model):
     def __str__(self):
         return self.name
 
+class User(models.Model):
+    username = models.CharField(max_length=150)
+    email = models.EmailField()
+    password = models.CharField(max_length=128)  # Hashed!
+    first_name = models.CharField(max_length=30)
+    last_name = models.CharField(max_length=30)
+    is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)
 
 # ------------------------------------------------
 # 2. Fact and Evidence Tables
@@ -70,6 +79,22 @@ class EventLog(models.Model):
         max_length=10,
         choices=EVENT_STATUS_CHOICES,
         default='NEW'
+    )
+
+    # Link to admin user who reviewed/closed the event
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_events',
+        help_text="Admin user who reviewed or handled this event"
+    )
+    
+    reviewed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the event was reviewed/closed by admin"
     )
 
     def __str__(self):

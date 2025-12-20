@@ -21,4 +21,14 @@ urlpatterns = [
 
     # Analytics endpoint for dashboard data
     path('api/analytics/', views.analytics_view, name='analytics'),
+
+    # Authentication API endpoints
+    path('api/register/', views.register_view, name='register'),
+    path('api/login/', views.login_view, name='login'),
+    path('api/logout/', views.logout_view, name='logout'),
+    path('api/current-user/', views.current_user_view, name='current_user'),
+
+    # Frontend pages
+    path('login/', views.login_page, name='login_page'),
+    path('register/', views.register_page, name='register_page'),
 ]

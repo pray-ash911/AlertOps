@@ -4,6 +4,208 @@ import pandas as pd
 import time
 import os
 from datetime import datetime
+import streamlit as st
+
+# ====== ADD THIS AT THE VERY TOP (after imports) ======
+st.markdown("""
+<style>
+    /* ====== MAIN DARK THEME ====== */
+    .stApp {
+        background: #0a0e27;
+        color: #ffffff;
+    }
+
+    /* ====== HEADERS ====== */
+    h1, h2, h3 {
+        background: linear-gradient(90deg, #0066ff, #00ccff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 1rem;
+    }
+
+    /* ====== STATUS BANNERS ====== */
+    .stAlert {
+        border-radius: 12px;
+        border: 1px solid;
+        font-weight: bold;
+    }
+
+    /* Alert status (weapon detected) */
+    div[data-testid="stAlert"]:has(div:contains("🚨")) {
+        background: rgba(163, 0, 0, 0.2) !important;
+        border-color: #ff3333 !important;
+        color: #ff9999 !important;
+    }
+
+    /* OK/Idle status */
+    div[data-testid="stAlert"]:has(div:contains("✅")) {
+        background: rgba(0, 102, 255, 0.2) !important;
+        border-color: #0066ff !important;
+        color: #99ccff !important;
+    }
+
+    /* ====== BUTTONS ====== */
+    .stButton > button {
+        background: linear-gradient(135deg, #0066ff, #00ccff);
+        color: white !important;
+        border: none !important;
+        border-radius: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 30px rgba(0, 102, 255, 0.3);
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 40px rgba(0, 102, 255, 0.4);
+    }
+
+    /* ====== DATA TABLE ====== */
+    .stDataFrame {
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(0, 102, 255, 0.3);
+        border-radius: 12px;
+        color: white;
+    }
+
+    /* Table headers */
+    .stDataFrame th {
+        background: rgba(0, 102, 255, 0.3) !important;
+        color: #00ccff !important;
+        font-weight: 700;
+    }
+
+    /* Table cells */
+    .stDataFrame td {
+        background: rgba(15, 23, 42, 0.6) !important;
+        color: #cbd5e1 !important;
+    }
+
+    /* ====== VIDEO FEED CONTAINER ====== */
+    .stMarkdown img {
+        border-radius: 12px;
+        border: 2px solid rgba(0, 102, 255, 0.3);
+        box-shadow: 0 0 40px rgba(0, 102, 255, 0.2);
+    }
+
+    /* ====== SIDEBAR ====== */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0a0e27 0%, #050916 100%);
+        border-right: 1px solid rgba(0, 102, 255, 0.3);
+    }
+
+    /* ====== METRICS ====== */
+    [data-testid="stMetricValue"] {
+        color: #00ccff !important;
+        font-size: 2rem !important;
+        font-weight: 700;
+    }
+
+    [data-testid="stMetricLabel"] {
+        color: #94a3b8 !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* ====== TABS ====== */
+    .stTabs [data-baseweb="tab-list"] {
+        background: rgba(15, 23, 42, 0.8);
+        border-radius: 12px;
+        padding: 5px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background: transparent;
+        color: #94a3b8;
+        border-radius: 8px;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #0066ff, #00ccff) !important;
+        color: white !important;
+    }
+
+    /* ====== GRID OVERLAY EFFECT ====== */
+    .stApp::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: 
+            linear-gradient(rgba(0, 102, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 102, 255, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        pointer-events: none;
+        z-index: -1;
+    }
+
+    /* ====== ANIMATED BACKGROUND ====== */
+    .stApp::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+            radial-gradient(circle at 20% 50%, rgba(0, 102, 255, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(255, 0, 102, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 40% 20%, rgba(102, 255, 102, 0.05) 0%, transparent 50%);
+        animation: bgPulse 10s ease-in-out infinite;
+        pointer-events: none;
+        z-index: -2;
+    }
+
+    @keyframes bgPulse {
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 1; }
+    }
+
+    /* ====== TEXT ELEMENTS ====== */
+    .stText, .stMarkdown, .stSubheader {
+        color: #cbd5e1;
+    }
+
+    /* ====== PROGRESS BARS ====== */
+    .stProgress > div > div {
+        background: linear-gradient(90deg, #0066ff, #00ccff);
+    }
+
+    /* ====== EXPANDERS ====== */
+    .streamlit-expanderHeader {
+        background: rgba(0, 102, 255, 0.1);
+        border: 1px solid rgba(0, 102, 255, 0.3);
+        border-radius: 8px;
+        color: #00ccff;
+    }
+
+    /* ====== YOUR ANALYTICS BUTTON ====== */
+    a button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+        transition: all 0.3s ease;
+        text-decoration: none !important;
+    }
+
+    a button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 30px rgba(102, 126, 234, 0.4);
+    }
+</style>
+""", unsafe_allow_html=True)
+
 
 # --- Configuration (UPDATE) ---
 # Local Django server URL for dashboard API calls
@@ -82,7 +284,47 @@ def fetch_event_logs():
 
 # --- Dashboard Layout ---
 
-st.title("🛡️ Real-Time AI Surveillance Dashboard (Weapon & Overcrowding)")
+# Navigation Header
+# Navigation Header
+col_title, col_nav = st.columns([3, 1])
+with col_title:
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; gap: 15px;">
+        <img src="{LOCAL_URL}/static/images/img_4.png" 
+             style="width: 130px; height: 130px; border-radius: 10px; 
+                    box-shadow: 0 0 15px rgba(0, 102, 255, 0.3); 
+                    border: 1px solid rgba(0, 102, 255, 0.2);">
+        <h1 style="margin: 0; 
+                   font-size: 2.2rem;
+                   font-weight: 700;
+                   background: linear-gradient(90deg, #0066ff, #00ccff);
+                   -webkit-background-clip: text;
+                   -webkit-text-fill-color: transparent;
+                   background-clip: text;">
+            Real-Time AI Surveillance Dashboard
+        </h1>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col_nav:
+    st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
+    # Button to navigate to analytics dashboard
+    st.markdown("""
+    <a href="http://127.0.0.1:8502" target="_self" style="text-decoration: none;">
+        <button style="background: linear-gradient(135deg, #0066ff 0%, #00ccff 100%);
+                       color: white;
+                       border: none;
+                       padding: 10px 20px;
+                       border-radius: 10px;
+                       font-size: 16px;
+                       font-weight: 600;
+                       cursor: pointer;
+                       width: 100%;
+                       transition: transform 0.2s;">
+            View Analytics Dashboard
+        </button>
+    </a>
+    """, unsafe_allow_html=True)
 
 # 1. Status Banner Placeholder (Top priority)
 status_placeholder = st.empty()
@@ -92,7 +334,7 @@ col1, col2 = st.columns([2, 1])
 
 # --- Column 1: Live Video Feed ---
 with col1:
-    st.header("Live Feed (YOLO Detection)")
+    st.header("Live Feed")
 
     # MJPEG stream from Django
     st.markdown(

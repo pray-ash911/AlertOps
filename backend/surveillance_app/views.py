@@ -4,9 +4,12 @@ import time
 import traceback
 import requests
 import urllib.parse
+import numpy as np
 from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
 from datetime import timedelta
 from django.utils import timezone
 from django.utils.timezone import localtime
@@ -17,6 +20,15 @@ from django.db.models.functions import TruncDate
 from .models import EventLog, EventType, EventEvidence, SurveillanceArea
 
 # --- REQUIRED IMPORTS AND MODEL INITIALIZATION ---
+
+# Initialize global variables (needed even if models fail to load)
+WEAPON_MODEL = None
+CROWD_MODEL = None
+WEAPON_EVENT_TYPE_OBJ = None
+WEAPON_EVENT_TYPE_ID = None
+OVERCROWDING_EVENT_TYPE_OBJ = None
+OVERCROWDING_EVENT_TYPE_ID = None
+
 try:
     from ultralytics import YOLO
 
@@ -225,6 +237,7 @@ def send_google_form_alert(snapshot_relative_path, label, confidence):
 # 2. SINGLE FRAME DETECTION VIEW (Placeholder)
 # ------------------------------------------------------------------
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def violence_detection_view(request):
     """
     DUMMY VIEW: Reintroduced to satisfy existing URL patterns in urls.py.
@@ -251,6 +264,13 @@ def generate_frames():
 
     if WEAPON_MODEL is None or CROWD_MODEL is None: # Check if both models are available first
         print("Model(s) not available. Exiting stream.")
+        # Yield an error frame instead of returning
+        error_img = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(error_img, "Models not loaded", (50, 240),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        error_frame = cv2.imencode('.jpg', error_img)[1].tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + error_frame + b'\r\n')
         return
 
     # --- GET THE EVENT TYPE OBJECTS ---
@@ -258,18 +278,54 @@ def generate_frames():
     overcrowding_event_type_obj = get_or_create_overcrowding_event_type()
     if weapon_event_type_obj is None or overcrowding_event_type_obj is None:
         print("ERROR: Could not get/create EventTypes. Exiting stream.")
+        # Yield an error frame
+        error_img = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(error_img, "EventTypes not available", (50, 240),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        error_frame = cv2.imencode('.jpg', error_img)[1].tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + error_frame + b'\r\n')
         return # Exit the stream if EventType is unavailable
 
     # 💡 FIX: Explicitly use DirectShow backend for stability on Windows
     # (CAP_DSHOW = 700, the preferred value for reliability on Windows/MSMF issues)
-    camera = cv2.VideoCapture(0 + cv2.CAP_DSHOW)
+    # Try multiple camera indices to find an available camera
+    camera = None
+    for camera_index in range(3):  # Try indices 0, 1, 2
+        test_camera = None
+        try:
+            test_camera = cv2.VideoCapture(camera_index + cv2.CAP_DSHOW)
+            if test_camera.isOpened():
+                # Test if we can actually read a frame
+                ret, _ = test_camera.read()
+                if ret:
+                    camera = test_camera
+                    print(f"Camera opened successfully at index {camera_index}")
+                    break
+                else:
+                    test_camera.release()
+                    test_camera = None
+        except Exception as e:
+            print(f"Error trying camera index {camera_index}: {e}")
+            if test_camera is not None:
+                test_camera.release()
 
-    if not camera.isOpened():
-        # Check both default (0) and the next index (1) just in case a virtual camera took 0
-        camera = cv2.VideoCapture(1 + cv2.CAP_DSHOW)
-        if not camera.isOpened():
-            print("CRITICAL: Camera is unavailable at index 0 or 1. Stopping stream.")
-            return
+    if camera is None or not camera.isOpened():
+        print("CRITICAL: No camera available at any index (0, 1, or 2). Stopping stream.")
+        # Yield an error frame showing camera unavailable
+        error_img = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(error_img, "Camera Unavailable", (150, 200),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        cv2.putText(error_img, "Please check camera connection", (100, 250),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(error_img, "Tried indices: 0, 1, 2", (100, 300),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        error_frame = cv2.imencode('.jpg', error_img)[1].tobytes()
+        while True:  # Keep yielding error frame
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + error_frame + b'\r\n')
+            time.sleep(1)  # Yield error frame every second
+        return
 
     last_annotated_frame = None  # Stores the last frame annotated by the model
     frame_count = 0
@@ -492,6 +548,7 @@ def generate_frames():
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def video_feed_view(request):
     """
     This view returns a StreamingHttpResponse that streams the weapon/crowd detection feed.
@@ -511,6 +568,7 @@ def video_feed_view(request):
 
 # --- NEW: Updated Event Logs View using EventLog and EventEvidence ---
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def event_logs_view(request):
     """ Returns a JSON list of all logged events for the dashboard. """
     try:
@@ -554,6 +612,8 @@ def event_logs_view(request):
 
 # --- NEW: Updated Latest Status View using EventLog (Handles Weapon & Overcrowding) ---
 # --- NEW: Updated Latest Status View using EventLog (Handles Weapon & Overcrowding) ---
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def get_latest_status(request):
     """API endpoint for Streamlit to poll for the most recent alert status."""
     try:
@@ -609,6 +669,7 @@ def get_latest_status(request):
 
 # --- NEW: Analytics View for Monthly Trends ---
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def analytics_view(request):
     """Returns JSON data for monthly trends (last 30 days) of events grouped by date and type."""
     try:
@@ -883,3 +944,127 @@ def generate_sample_recent_events():
         })
     
     return recent_events
+
+
+# ------------------------------------------------------------------
+# 5. AUTHENTICATION VIEWS (Login & Register for Admin Users)
+# ------------------------------------------------------------------
+
+from django.contrib.auth import login, logout
+from .serializers import UserRegistrationSerializer, UserLoginSerializer, UserSerializer
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def register_view(request):
+    """
+    Register a new admin user.
+    
+    GET /api/register/ - Redirects to registration page
+    POST /api/register/
+    Body: {
+        "username": "admin",
+        "email": "admin@example.com",
+        "password": "password123",
+        "password_confirm": "password123",
+        "first_name": "Admin",
+        "last_name": "User"
+    }
+    """
+    if request.method == 'GET':
+        from django.shortcuts import redirect
+        return redirect('register_page')
+    
+    serializer = UserRegistrationSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        user = serializer.save()
+        # Don't auto-login, redirect to login page
+        # Return user info (excluding password)
+        user_data = UserSerializer(user).data
+        return Response({
+            'message': 'User registered successfully. Please login.',
+            'user': user_data,
+            'redirect': '/login/'
+        }, status=status.HTTP_201_CREATED)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def login_view(request):
+    """
+    Login an admin user.
+    
+    GET /api/login/ - Redirects to login page
+    POST /api/login/
+    Body: {
+        "email": "admin@example.com" or "username": "admin",
+        "password": "password123"
+    }
+    """
+    if request.method == 'GET':
+        from django.shortcuts import redirect
+        return redirect('login_page')
+    
+    serializer = UserLoginSerializer(data=request.data, context={'request': request})
+    
+    if serializer.is_valid():
+        user = serializer.validated_data['user']
+        login(request, user)
+        
+        # Return user info with redirect to dashboard
+        user_data = UserSerializer(user).data
+        return Response({
+            'message': 'Login successful',
+            'user': user_data,
+            'redirect': '/dashboard/'  # Redirect to Streamlit dashboard
+        }, status=status.HTTP_200_OK)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    """
+    Logout the current user.
+    
+    POST /api/logout/
+    Requires authentication.
+    """
+    logout(request)
+    return Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_user_view(request):
+    """
+    Get current authenticated user information.
+    
+    GET /api/current-user/
+    Requires authentication.
+    """
+    user_data = UserSerializer(request.user).data
+    return Response({'user': user_data}, status=status.HTTP_200_OK)
+
+
+# ------------------------------------------------------------------
+# 6. FRONTEND VIEWS (Login & Register Pages)
+# ------------------------------------------------------------------
+
+from django.shortcuts import render, redirect
+
+def login_page(request):
+    """Render login page - always accessible"""
+    # Always show the login page, even if user is authenticated
+    # The frontend can show a message if already logged in
+    return render(request, 'surveillance_app/login.html')
+
+def register_page(request):
+    """Render register page - always accessible"""
+    # Always show the register page, even if user is authenticated
+    # The frontend can show a message if already logged in
+    return render(request, 'surveillance_app/register.html')

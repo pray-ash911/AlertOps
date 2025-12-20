@@ -9,70 +9,199 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import json
 
-# Set page config
-st.set_page_config(
-    page_title="AI Surveillance Analyticss Dashboard",
-    layout="wide",
-    initial_sidebar_state="expanded",
-    page_icon="📊"
-)
-
-# Custom CSS
+# Custom CSS - Dark Cyber Security Theme
 st.markdown("""
 <style>
+    /* ====== MAIN BACKGROUND ====== */
+    .stApp {
+        background: #0a0e27;
+        color: #ffffff;
+    }
+
+    /* ====== HEADERS ====== */
     .main-header {
         font-size: 2.8rem;
-        color: #1E3A8A;
         font-weight: 700;
         margin-bottom: 1rem;
         text-align: center;
         padding: 1rem;
-        background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%);
+        background: linear-gradient(90deg, #0066ff, #00ccff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        text-shadow: 0 0 20px rgba(0, 102, 255, 0.3);
     }
+
     .sub-header {
         font-size: 1.8rem;
-        color: #374151;
+        color: #00ccff;
         font-weight: 600;
         margin-top: 2rem;
         margin-bottom: 1.5rem;
-        border-bottom: 3px solid #3B82F6;
+        border-bottom: 2px solid rgba(0, 102, 255, 0.3);
         padding-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
+
+    /* ====== METRIC CARDS ====== */
     .metric-card {
-        background: white;
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(10px);
         padding: 1.5rem;
         border-radius: 12px;
         margin-bottom: 1rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border-left: 5px solid #3B82F6;
-        transition: transform 0.2s;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(0, 102, 255, 0.2);
+        transition: transform 0.3s ease;
     }
+
     .metric-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-5px);
+        box-shadow: 0 8px 30px rgba(0, 102, 255, 0.4);
+        border-color: rgba(0, 102, 255, 0.4);
     }
+
     .weapon-card {
-        border-left: 5px solid #DC2626;
+        border-left: 5px solid #ff3333;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(163, 0, 0, 0.2));
     }
+
     .crowd-card {
         border-left: 5px solid #10B981;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(16, 185, 129, 0.2));
     }
+
     .total-card {
         border-left: 5px solid #8B5CF6;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(139, 92, 246, 0.2));
     }
+
     .metric-value {
         font-size: 2.5rem;
         font-weight: 700;
-        color: #1F2937;
+        color: #ffffff;
+        text-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
     }
+
     .metric-label {
         font-size: 1rem;
-        color: #6B7280;
+        color: #94a3b8;
         margin-top: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
+
+    /* ====== SIDEBAR ====== */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0a0e27 0%, #050916 100%);
+        border-right: 1px solid rgba(0, 102, 255, 0.3);
+    }
+
+    [data-testid="stSidebar"] h1, 
+    [data-testid="stSidebar"] h2, 
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] div {
+        color: #cbd5e1 !important;
+    }
+
+    /* ====== BUTTONS ====== */
+    .stButton > button {
+        background: linear-gradient(135deg, #0066ff, #00ccff);
+        color: white !important;
+        border: none !important;
+        border-radius: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 30px rgba(0, 102, 255, 0.3);
+        padding: 0.5rem 2rem;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 40px rgba(0, 102, 255, 0.4);
+    }
+
+    /* ====== INFO BOXES ====== */
+    .info-box {
+        background: rgba(0, 102, 255, 0.1);
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid #0066ff;
+        margin: 1rem 0;
+        color: #cbd5e1;
+        backdrop-filter: blur(10px);
+    }
+
+    /* ====== DATA TABLES ====== */
+    .stDataFrame {
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(0, 102, 255, 0.3);
+        border-radius: 12px;
+        color: white;
+    }
+
+    /* Table headers */
+    .stDataFrame th {
+        background: rgba(0, 102, 255, 0.3) !important;
+        color: #00ccff !important;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Table cells */
+    .stDataFrame td {
+        background: rgba(15, 23, 42, 0.6) !important;
+        color: #cbd5e1 !important;
+        border-bottom: 1px solid rgba(0, 102, 255, 0.1) !important;
+    }
+
+    /* ====== TABS ====== */
+    .stTabs [data-baseweb="tab-list"] {
+        background: rgba(15, 23, 42, 0.8);
+        border-radius: 12px;
+        padding: 5px;
+        border: 1px solid rgba(0, 102, 255, 0.3);
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background: transparent;
+        color: #94a3b8;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #0066ff, #00ccff) !important;
+        color: white !important;
+    }
+
+    /* ====== METRICS ====== */
+    [data-testid="stMetricValue"] {
+        color: #00ccff !important;
+        font-size: 2rem !important;
+        font-weight: 700;
+        text-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+    }
+
+    [data-testid="stMetricLabel"] {
+        color: #94a3b8 !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.9rem !important;
+    }
+
+    /* ====== TEXT ELEMENTS ====== */
+    .stText, .stMarkdown, p, div, span {
+        color: #cbd5e1 !important;
+    }
+
+    /* ====== BADGES ====== */
     .alert-badge {
         display: inline-block;
         padding: 0.5rem 1rem;
@@ -82,66 +211,134 @@ st.markdown("""
         margin-right: 0.5rem;
         margin-bottom: 0.5rem;
     }
+
     .weapon-alert {
-        background-color: #FEE2E2;
-        color: #DC2626;
-        border: 1px solid #FCA5A5;
+        background-color: rgba(220, 38, 38, 0.2);
+        color: #fca5a5;
+        border: 1px solid rgba(220, 38, 38, 0.4);
     }
+
     .crowd-alert {
-        background-color: #D1FAE5;
-        color: #065F46;
-        border: 1px solid #6EE7B7;
+        background-color: rgba(16, 185, 129, 0.2);
+        color: #6ee7b7;
+        border: 1px solid rgba(16, 185, 129, 0.4);
     }
-    .info-box {
-        background-color: #EFF6FF;
-        padding: 1.5rem;
-        border-radius: 10px;
-        border-left: 4px solid #3B82F6;
-        margin: 1rem 0;
-    }
-    .stDataFrame {
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .left-align {
-        text-align: left !important;
-    }
-    .right-align {
-        text-align: right !important;
-    }
-    .section-header {
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: #374151;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 2px solid #E5E7EB;
-    }
+
+    /* ====== HOUR STAT BOXES ====== */
     .hour-stat-box {
-        background-color: #F9FAFB;
+        background: rgba(15, 23, 42, 0.8);
         padding: 1rem;
         border-radius: 8px;
         margin-bottom: 0.75rem;
-        border: 1px solid #E5E7EB;
+        border: 1px solid rgba(0, 102, 255, 0.2);
+    }
+
+    /* ====== ANIMATED BACKGROUND EFFECTS ====== */
+    .stApp::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: 
+            linear-gradient(rgba(0, 102, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 102, 255, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        pointer-events: none;
+        z-index: -1;
+    }
+
+    /* ====== RADIO BUTTONS ====== */
+    .stRadio > div {
+        background: rgba(15, 23, 42, 0.8);
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(0, 102, 255, 0.2);
+    }
+
+    /* ====== SLIDERS ====== */
+    .stSlider > div > div {
+        background: linear-gradient(90deg, #0066ff, #00ccff);
+    }
+
+    .stSlider > div > div > div {
+        color: #cbd5e1;
+    }
+
+    /* ====== CHECKBOXES ====== */
+    .stCheckbox > label {
+        color: #cbd5e1;
+    }
+
+    /* ====== SECTION HEADERS ====== */
+    .section-header {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #00ccff !important;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid rgba(0, 102, 255, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* ====== ALIGNMENT ====== */
+    .left-align {
+        text-align: left !important;
+    }
+
+    .right-align {
+        text-align: right !important;
+    }
+
+    /* ====== ANIMATIONS ====== */
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.8; }
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Set page config
+st.set_page_config(
+    page_title="AI Surveillance Analytics Dashboard",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    page_icon=""
+)
 
 # Configuration
 LOCAL_URL = "http://127.0.0.1:8000"
 ANALYTICS_URL = f"{LOCAL_URL}/api/analytics/"
 
-# Title
-st.markdown('<h1 class="main-header">Weapon & Overcrowding Detection Analytics Dashboard</h1>', unsafe_allow_html=True)
-
+# Title with Logo
+st.markdown(f"""
+<div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 2rem;">
+    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px;">
+        <img src="{LOCAL_URL}/static/images/img_5.png" 
+             style="width: 80px; height: 80px; border-radius: 12px; 
+                    box-shadow: 0 0 25px rgba(0, 102, 255, 0.4); 
+                    border: 2px solid rgba(0, 102, 255, 0.3);
+                    filter: drop-shadow(0 0 15px rgba(0, 102, 255, 0.5));">
+        <h1 class="main-header" style="margin: 0; font-size: 2.8rem;">
+            Weapon and Overcrowding Detection Analytics Dashboard
+        </h1>
+    </div>
+    <div style="color: #94a3b8; font-size: 1.1rem; font-weight: 500; text-align: center; 
+                margin-top: 10px; letter-spacing: 1px; text-transform: uppercase;">
+        Advanced Security Intelligence & Threat Analysis
+    </div>
+</div>
+""", unsafe_allow_html=True)
 # Sidebar Configuration
 st.sidebar.header("Dashboard Configuration")
 st.sidebar.markdown("---")
 
 # Data source selection
 data_source = st.sidebar.radio(
-    "Select Data Source:",
-    ["Live API", "Sample Data"],
+    "Data Source:",
+    ["Live API"],
     index=0
 )
 
@@ -170,7 +367,15 @@ if st.sidebar.button("Refresh Data", width='stretch'):
     st.rerun()
 
 st.sidebar.markdown("---")
-st.sidebar.info("Dashboard Information\n\n• Shows weapon and overcrowding detection analytics\n• Data updates automatically\n• Click refresh to get latest data")
+st.sidebar.markdown("""
+<div style="background: rgba(0, 102, 255, 0.1); padding: 1rem; border-radius: 8px; border-left: 3px solid #0066ff;">
+    <strong> Dashboard Information</strong><br>
+    • Shows weapon and overcrowding detection analytics<br>
+    • Data updates automatically<br>
+    • Click refresh to get latest data
+</div>
+""", unsafe_allow_html=True)
+
 
 # Fetch data function
 @st.cache_data(ttl=300)  # Cache for 5 minutes
@@ -186,11 +391,12 @@ def fetch_analytics_data():
         st.error(f"Connection Error: {e}")
         return None
 
+
 # Load data
 if data_source == "Live API":
     with st.spinner("Fetching data from API..."):
         data = fetch_analytics_data()
-    
+
     if data is None:
         st.warning("Could not connect to API. Using sample data.")
         data_source = "Sample Data"
@@ -199,11 +405,11 @@ if data_source == "Sample Data" or data is None:
     # Generate comprehensive sample data
     dates = pd.date_range(end=datetime.now(), periods=days_back, freq='D')
     analytics_data = []
-    
+
     for i, date in enumerate(dates):
         # Create realistic patterns
         day_of_week = date.weekday()
-        
+
         # Weekends have more events
         if day_of_week >= 5:  # Saturday, Sunday
             weapon = np.random.poisson(lam=2.5)
@@ -216,19 +422,19 @@ if data_source == "Sample Data" or data is None:
         else:
             weapon = np.random.poisson(lam=1.2)
             crowd = np.random.poisson(lam=4)
-        
+
         # Add some trend/pattern
         if i > days_back * 0.7:  # Recent days have more activity
             weapon = min(weapon + np.random.randint(0, 2), 5)
             crowd = min(crowd + np.random.randint(0, 3), 12)
-        
+
         analytics_data.append({
             'date': date.strftime('%Y-%m-%d'),
             'weapon': int(weapon),
             'overcrowding': int(crowd),
             'total_detections': int(weapon + crowd)
         })
-    
+
     # Create sample data structure
     data = {
         'daily_analytics': analytics_data,
@@ -266,7 +472,11 @@ hourly_df = pd.DataFrame(data['hourly_analytics'])
 
 # Display data source info
 source_info = "Sample Data" if data_source == "Sample Data" else "Live API Data"
-st.info(f"Data Source: {source_info} | Period: Last {days_back} days | Last Updated: {datetime.now().strftime('%H:%M:%S')}")
+st.markdown(f"""
+<div class="info-box">
+    <strong>Data Status:</strong> {source_info} | <strong>  Period:</strong> Last {days_back} days | <strong> Last Updated:</strong> {datetime.now().strftime('%H:%M:%S')}
+</div>
+""", unsafe_allow_html=True)
 
 # Row 1: Key Metrics
 st.markdown('<h2 class="sub-header">Key Performance Indicators</h2>', unsafe_allow_html=True)
@@ -279,7 +489,7 @@ with col1:
     <div class="metric-card weapon-card">
         <div class="metric-value">{total_weapons}</div>
         <div class="metric-label">Total Weapons Detected</div>
-        <div style="font-size: 0.8rem; color: #9CA3AF; margin-top: 0.5rem;">
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.5rem;">
             Avg: {data['summary']['avg_daily_weapons']}/day
         </div>
     </div>
@@ -291,7 +501,7 @@ with col2:
     <div class="metric-card crowd-card">
         <div class="metric-value">{total_crowd}</div>
         <div class="metric-label">Overcrowding Events</div>
-        <div style="font-size: 0.8rem; color: #9CA3AF; margin-top: 0.5rem;">
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.5rem;">
             Avg: {data['summary']['avg_daily_crowd']}/day
         </div>
     </div>
@@ -303,7 +513,7 @@ with col3:
     <div class="metric-card total-card">
         <div class="metric-value">{total_all}</div>
         <div class="metric-label">Total Security Events</div>
-        <div style="font-size: 0.8rem; color: #9CA3AF; margin-top: 0.5rem;">
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.5rem;">
             Combined detection count
         </div>
     </div>
@@ -315,7 +525,7 @@ with col4:
     <div class="metric-card weapon-card">
         <div class="metric-value">{today_weapon}</div>
         <div class="metric-label">Today's Weapons</div>
-        <div style="font-size: 0.8rem; color: #9CA3AF; margin-top: 0.5rem;">
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.5rem;">
             Current day detection
         </div>
     </div>
@@ -327,7 +537,7 @@ with col5:
     <div class="metric-card crowd-card">
         <div class="metric-value">{today_crowd}</div>
         <div class="metric-label">Today's Crowd Events</div>
-        <div style="font-size: 0.8rem; color: #9CA3AF; margin-top: 0.5rem;">
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.5rem;">
             Current day events
         </div>
     </div>
@@ -339,7 +549,7 @@ with col6:
     <div class="metric-card total-card">
         <div class="metric-value">{peak_hour}</div>
         <div class="metric-label">Peak Activity Hour</div>
-        <div style="font-size: 0.8rem; color: #9CA3AF; margin-top: 0.5rem;">
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.5rem;">
             Weapons: {data['summary'].get('peak_hour_weapon', 0)} | Crowd: {data['summary'].get('peak_hour_crowd', 0)}
         </div>
     </div>
@@ -378,7 +588,7 @@ with tab1:
         title=f"Daily Detection Trends (Last {days_back} Days)",
         xaxis_title="Date",
         yaxis_title="Number of Events",
-        template="plotly_white",
+        template="plotly_dark",
         height=chart_height,
         barmode='group',
         legend=dict(
@@ -386,26 +596,40 @@ with tab1:
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1
+            x=1,
+            bgcolor='rgba(15, 23, 42, 0.8)',
+            bordercolor='rgba(0, 102, 255, 0.3)',
+            font=dict(color='#cbd5e1')
         ),
-        plot_bgcolor='rgba(240, 240, 240, 0.5)',
-        paper_bgcolor='rgba(255, 255, 255, 0.9)',
-        font=dict(family="Arial, sans-serif")
+        plot_bgcolor='rgba(15, 23, 42, 0.6)',
+        paper_bgcolor='rgba(15, 23, 42, 0.8)',
+        font=dict(color='#cbd5e1', family="Arial, sans-serif"),
+        title_font=dict(color='#00ccff', size=20)
     )
 
     # Add grid
-    fig_daily.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
-    fig_daily.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+    fig_daily.update_xaxes(
+        showgrid=True,
+        gridwidth=1,
+        gridcolor='rgba(0, 102, 255, 0.2)',
+        linecolor='rgba(0, 102, 255, 0.3)'
+    )
+    fig_daily.update_yaxes(
+        showgrid=True,
+        gridwidth=1,
+        gridcolor='rgba(0, 102, 255, 0.2)',
+        linecolor='rgba(0, 102, 255, 0.3)'
+    )
 
     st.plotly_chart(fig_daily, width='stretch')
 
 with tab2:
     col1, col2 = st.columns(2)
-    
+
     with col1:
         # Stacked area chart
         fig_area = go.Figure()
-        
+
         if show_weapons and 'weapon' in daily_df.columns:
             fig_area.add_trace(go.Scatter(
                 x=daily_df['date'],
@@ -417,7 +641,7 @@ with tab2:
                 fillcolor='rgba(255, 0, 0, 0.4)',
                 hovertemplate='Date: %{x}<br>Weapons: %{y}<extra></extra>'
             ))
-        
+
         if show_crowd and 'overcrowding' in daily_df.columns:
             fig_area.add_trace(go.Scatter(
                 x=daily_df['date'],
@@ -429,25 +653,29 @@ with tab2:
                 fillcolor='rgba(0, 0, 255, 0.4)',
                 hovertemplate='Date: %{x}<br>Crowd Events: %{y}<extra></extra>'
             ))
-        
+
         fig_area.update_layout(
             title="Stacked Daily Events",
             xaxis_title="Date",
             yaxis_title="Number of Events",
-            template="plotly_white",
+            template="plotly_dark",
             height=chart_height - 50,
-            showlegend=True
+            showlegend=True,
+            plot_bgcolor='rgba(15, 23, 42, 0.6)',
+            paper_bgcolor='rgba(15, 23, 42, 0.8)',
+            font=dict(color='#cbd5e1'),
+            title_font=dict(color='#00ccff')
         )
 
         st.plotly_chart(fig_area, width='stretch')
-    
+
     with col2:
         # Bar chart for comparison
         fig_bar = go.Figure()
-        
+
         # Show last 14 days for better visibility
         recent_df = daily_df.tail(14)
-        
+
         if show_weapons:
             fig_bar.add_trace(go.Bar(
                 x=recent_df['date'],
@@ -457,7 +685,7 @@ with tab2:
                 opacity=0.8,
                 hovertemplate='Date: %{x}<br>Weapons: %{y}<extra></extra>'
             ))
-        
+
         if show_crowd:
             fig_bar.add_trace(go.Bar(
                 x=recent_df['date'],
@@ -467,46 +695,51 @@ with tab2:
                 opacity=0.8,
                 hovertemplate='Date: %{x}<br>Crowd Events: %{y}<extra></extra>'
             ))
-        
+
         fig_bar.update_layout(
             title="Recent 14 Days Comparison",
             xaxis_title="Date",
             yaxis_title="Count",
             barmode='group',
-            template="plotly_white",
+            template="plotly_dark",
             height=chart_height - 50,
-            showlegend=True
+            showlegend=True,
+            plot_bgcolor='rgba(15, 23, 42, 0.6)',
+            paper_bgcolor='rgba(15, 23, 42, 0.8)',
+            font=dict(color='#cbd5e1'),
+            title_font=dict(color='#00ccff')
         )
 
         st.plotly_chart(fig_bar, width='stretch')
 
 with tab3:
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
-        st.markdown("### Weapon Statistics")
+        st.markdown("Weapon Statistics")
         if 'weapon' in daily_df.columns:
             st.metric("Average Daily", f"{daily_df['weapon'].mean():.2f}")
             st.metric("Maximum Daily", f"{daily_df['weapon'].max():.0f}")
             st.metric("Minimum Daily", f"{daily_df['weapon'].min():.0f}")
             st.metric("Standard Deviation", f"{daily_df['weapon'].std():.2f}")
             st.metric("Days with Weapons", f"{(daily_df['weapon'] > 0).sum():.0f}")
-    
+
     with col2:
-        st.markdown("### Crowd Statistics")
+        st.markdown("Crowd Statistics")
         if 'overcrowding' in daily_df.columns:
             st.metric("Average Daily", f"{daily_df['overcrowding'].mean():.2f}")
             st.metric("Maximum Daily", f"{daily_df['overcrowding'].max():.0f}")
             st.metric("Minimum Daily", f"{daily_df['overcrowding'].min():.0f}")
             st.metric("Standard Deviation", f"{daily_df['overcrowding'].std():.2f}")
             st.metric("Days with Crowd Events", f"{(daily_df['overcrowding'] > 0).sum():.0f}")
-    
+
     with col3:
-        st.markdown("### Combined Statistics")
+        st.markdown("Combined Statistics")
         if 'total_detections' in daily_df.columns:
             st.metric("Total Events", f"{daily_df['total_detections'].sum():.0f}")
             st.metric("Average Total Daily", f"{daily_df['total_detections'].mean():.2f}")
-            correlation = daily_df['weapon'].corr(daily_df['overcrowding']) if 'weapon' in daily_df.columns and 'overcrowding' in daily_df.columns else 0
+            correlation = daily_df['weapon'].corr(
+                daily_df['overcrowding']) if 'weapon' in daily_df.columns and 'overcrowding' in daily_df.columns else 0
             st.metric("Weapon-Crowd Correlation", f"{correlation:.3f}")
             st.metric("Highest Alert Day", f"{daily_df['total_detections'].max():.0f}")
             st.metric("Alert-Free Days", f"{(daily_df['total_detections'] == 0).sum():.0f}")
@@ -519,10 +752,10 @@ col1, col2 = st.columns([2, 1])
 with col1:
     # Hourly bar chart with dual y-axis
     fig_hourly = go.Figure()
-    
+
     # Create secondary y-axis for weapons
     fig_hourly = make_subplots(specs=[[{"secondary_y": True}]])
-    
+
     if show_weapons:
         fig_hourly.add_trace(
             go.Bar(
@@ -535,7 +768,7 @@ with col1:
             ),
             secondary_y=False,
         )
-    
+
     if show_crowd:
         fig_hourly.add_trace(
             go.Bar(
@@ -548,41 +781,53 @@ with col1:
             ),
             secondary_y=True,
         )
-    
+
     # Set x-axis properties
     fig_hourly.update_xaxes(
         title_text="Hour of Day",
         tickmode='array',
         tickvals=list(range(0, 24, 2)),
-        ticktext=[f"{h:02d}:00" for h in range(0, 24, 2)]
+        ticktext=[f"{h:02d}:00" for h in range(0, 24, 2)],
+        gridcolor='rgba(0, 102, 255, 0.2)',
+        linecolor='rgba(0, 102, 255, 0.3)'
     )
-    
+
     # Set y-axes properties
     fig_hourly.update_yaxes(
         title_text="Weapon Detections",
         secondary_y=False,
-        title_font=dict(color="red")
+        title_font=dict(color="red"),
+        gridcolor='rgba(0, 102, 255, 0.2)',
+        linecolor='rgba(0, 102, 255, 0.3)'
     )
-    
+
     fig_hourly.update_yaxes(
         title_text="Overcrowding Events",
         secondary_y=True,
-        title_font=dict(color="blue")
+        title_font=dict(color="blue"),
+        gridcolor='rgba(0, 102, 255, 0.2)',
+        linecolor='rgba(0, 102, 255, 0.3)'
     )
-    
+
     fig_hourly.update_layout(
         title="Hourly Distribution of Events",
         barmode='overlay',
         height=chart_height,
-        template="plotly_white",
+        template="plotly_dark",
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1
+            x=1,
+            bgcolor='rgba(15, 23, 42, 0.8)',
+            bordercolor='rgba(0, 102, 255, 0.3)',
+            font=dict(color='#cbd5e1')
         ),
-        plot_bgcolor='rgba(240, 240, 240, 0.5)'
+        plot_bgcolor='rgba(15, 23, 42, 0.6)',
+        paper_bgcolor='rgba(15, 23, 42, 0.8)',
+        font=dict(color='#cbd5e1'),
+        title_font=dict(color='#00ccff')
     )
 
     st.plotly_chart(fig_hourly, width='stretch')
@@ -590,51 +835,65 @@ with col1:
 with col2:
     # Top Weapon Hours - Left aligned
     if show_weapons and 'weapon' in hourly_df.columns:
-        st.markdown('<h3 class="left-align">Top Weapon Hours</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="left-align" style="color: #ff6666;">Top Weapon Hours</h3>', unsafe_allow_html=True)
         top_weapon_hours = hourly_df.nlargest(3, 'weapon')[['hour', 'weapon']]
         for idx, row in top_weapon_hours.iterrows():
             col_left, col_right = st.columns([2, 1])
             with col_left:
-                st.markdown(f"<p style='font-weight: 600; color: #DC2626; margin: 0;'>{int(row['hour']):02d}:00</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-weight: 600; color: #ff6666; margin: 0;'>{int(row['hour']):02d}:00</p>",
+                            unsafe_allow_html=True)
             with col_right:
-                st.markdown(f"<p style='font-weight: 700; color: #DC2626; text-align: right; margin: 0;'>{int(row['weapon'])}</p>", unsafe_allow_html=True)
-            st.markdown(f"<div style='height: 1px; background-color: #E5E7EB; margin: 0.5rem 0;'></div>", unsafe_allow_html=True)
-    
+                st.markdown(
+                    f"<p style='font-weight: 700; color: #ff6666; text-align: right; margin: 0;'>{int(row['weapon'])}</p>",
+                    unsafe_allow_html=True)
+            st.markdown(f"<div style='height: 1px; background-color: rgba(0, 102, 255, 0.2); margin: 0.5rem 0;'></div>",
+                        unsafe_allow_html=True)
+
     # Top Crowd Hours - Left aligned
     if show_crowd and 'overcrowding' in hourly_df.columns:
-        st.markdown('<h3 class="left-align">Top Crowd Hours</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="left-align" style="color: #6ee7b7;">Top Crowd Hours</h3>', unsafe_allow_html=True)
         top_crowd_hours = hourly_df.nlargest(3, 'overcrowding')[['hour', 'overcrowding']]
         for idx, row in top_crowd_hours.iterrows():
             col_left, col_right = st.columns([2, 1])
             with col_left:
-                st.markdown(f"<p style='font-weight: 600; color: #065F46; margin: 0;'>{int(row['hour']):02d}:00</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-weight: 600; color: #6ee7b7; margin: 0;'>{int(row['hour']):02d}:00</p>",
+                            unsafe_allow_html=True)
             with col_right:
-                st.markdown(f"<p style='font-weight: 700; color: #065F46; text-align: right; margin: 0;'>{int(row['overcrowding'])}</p>", unsafe_allow_html=True)
-            st.markdown(f"<div style='height: 1px; background-color: #E5E7EB; margin: 0.5rem 0;'></div>", unsafe_allow_html=True)
-    
+                st.markdown(
+                    f"<p style='font-weight: 700; color: #6ee7b7; text-align: right; margin: 0;'>{int(row['overcrowding'])}</p>",
+                    unsafe_allow_html=True)
+            st.markdown(f"<div style='height: 1px; background-color: rgba(0, 102, 255, 0.2); margin: 0.5rem 0;'></div>",
+                        unsafe_allow_html=True)
+
     # Hourly Summary - Aligned left/right
-    st.markdown('<h3 class="left-align">Hourly Summary</h3>', unsafe_allow_html=True)
-    
+    st.markdown('<h3 class="left-align" style="color: #00ccff;">Hourly Summary</h3>', unsafe_allow_html=True)
+
     if show_weapons:
         avg_weapons_hourly = hourly_df['weapon'].mean()
         col_left, col_right = st.columns([2, 1])
         with col_left:
-            st.markdown("<p style='margin: 0; color: #374151;'>Avg Weapons/Hour</p>", unsafe_allow_html=True)
+            st.markdown("<p style='margin: 0; color: #cbd5e1;'>Avg Weapons/Hour</p>", unsafe_allow_html=True)
         with col_right:
-            st.markdown(f"<p style='margin: 0; font-weight: 600; text-align: right;'>{avg_weapons_hourly:.2f}</p>", unsafe_allow_html=True)
-        st.markdown(f"<div style='height: 1px; background-color: #E5E7EB; margin: 0.5rem 0;'></div>", unsafe_allow_html=True)
-    
+            st.markdown(
+                f"<p style='margin: 0; font-weight: 600; text-align: right; color: #ff6666;'>{avg_weapons_hourly:.2f}</p>",
+                unsafe_allow_html=True)
+        st.markdown(f"<div style='height: 1px; background-color: rgba(0, 102, 255, 0.2); margin: 0.5rem 0;'></div>",
+                    unsafe_allow_html=True)
+
     if show_crowd:
         avg_crowd_hourly = hourly_df['overcrowding'].mean()
         col_left, col_right = st.columns([2, 1])
         with col_left:
-            st.markdown("<p style='margin: 0; color: #374151;'>Avg Crowd Events/Hour</p>", unsafe_allow_html=True)
+            st.markdown("<p style='margin: 0; color: #cbd5e1;'>Avg Crowd Events/Hour</p>", unsafe_allow_html=True)
         with col_right:
-            st.markdown(f"<p style='margin: 0; font-weight: 600; text-align: right;'>{avg_crowd_hourly:.2f}</p>", unsafe_allow_html=True)
-        st.markdown(f"<div style='height: 1px; background-color: #E5E7EB; margin: 0.5rem 0;'></div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<p style='margin: 0; font-weight: 600; text-align: right; color: #6ee7b7;'>{avg_crowd_hourly:.2f}</p>",
+                unsafe_allow_html=True)
+        st.markdown(f"<div style='height: 1px; background-color: rgba(0, 102, 255, 0.2); margin: 0.5rem 0;'></div>",
+                    unsafe_allow_html=True)
 
-# Row 4: Weekly & Monthly Analysis
-st.markdown('<h2 class="sub-header">Weekly & Monthly Patterns</h2>', unsafe_allow_html=True)
+# Row 4: Weekly and Monthly Analysis
+st.markdown('<h2 class="sub-header">Weekly And Monthly Patterns</h2>', unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 
@@ -645,9 +904,9 @@ with col1:
         'overcrowding': 'mean',
         'total_detections': 'mean'
     }).reindex(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
-    
+
     fig_weekly = go.Figure()
-    
+
     if show_weapons:
         fig_weekly.add_trace(go.Bar(
             x=weekly_stats.index,
@@ -657,7 +916,7 @@ with col1:
             opacity=0.7,
             hovertemplate='Day: %{x}<br>Avg Weapons: %{y:.2f}<extra></extra>'
         ))
-    
+
     if show_crowd:
         fig_weekly.add_trace(go.Bar(
             x=weekly_stats.index,
@@ -667,16 +926,20 @@ with col1:
             opacity=0.7,
             hovertemplate='Day: %{x}<br>Avg Crowd Events: %{y:.2f}<extra></extra>'
         ))
-    
+
     fig_weekly.update_layout(
         title="Average Events by Day of Week",
         xaxis_title="Day",
         yaxis_title="Average Count",
         barmode='group',
-        template="plotly_white",
-        height=chart_height - 100
+        template="plotly_dark",
+        height=chart_height - 100,
+        plot_bgcolor='rgba(15, 23, 42, 0.6)',
+        paper_bgcolor='rgba(15, 23, 42, 0.8)',
+        font=dict(color='#cbd5e1'),
+        title_font=dict(color='#00ccff')
     )
-    
+
     st.plotly_chart(fig_weekly, use_container_width=True)
 
 with col2:
@@ -687,9 +950,9 @@ with col2:
             'overcrowding': 'sum',
             'total_detections': 'sum'
         }).reset_index()
-        
+
         fig_monthly = go.Figure()
-        
+
         if show_weapons:
             fig_monthly.add_trace(go.Bar(
                 x=monthly_stats['month'],
@@ -699,7 +962,7 @@ with col2:
                 opacity=0.7,
                 hovertemplate='Month: %{x}<br>Total Weapons: %{y}<extra></extra>'
             ))
-        
+
         if show_crowd:
             fig_monthly.add_trace(go.Bar(
                 x=monthly_stats['month'],
@@ -709,25 +972,29 @@ with col2:
                 opacity=0.7,
                 hovertemplate='Month: %{x}<br>Total Crowd Events: %{y}<extra></extra>'
             ))
-        
+
         fig_monthly.update_layout(
             title="Monthly Totals",
             xaxis_title="Month",
             yaxis_title="Total Count",
             barmode='group',
-            template="plotly_white",
-            height=chart_height - 100
+            template="plotly_dark",
+            height=chart_height - 100,
+            plot_bgcolor='rgba(15, 23, 42, 0.6)',
+            paper_bgcolor='rgba(15, 23, 42, 0.8)',
+            font=dict(color='#cbd5e1'),
+            title_font=dict(color='#00ccff')
         )
-        
+
         st.plotly_chart(fig_monthly, use_container_width=True)
     else:
         # Show distribution pie chart
         st.markdown("### Event Distribution")
-        
+
         # Calculate percentages
         total_weapons = data['summary']['total_weapons']
         total_crowd = data['summary']['total_overcrowding']
-        
+
         fig_pie = go.Figure(data=[go.Pie(
             labels=['Weapon Detections', 'Overcrowding Events'],
             values=[total_weapons, total_crowd],
@@ -736,16 +1003,19 @@ with col2:
             textinfo='label+percent',
             hovertemplate='%{label}: %{value} events<extra></extra>'
         )])
-        
+
         fig_pie.update_layout(
             height=chart_height - 100,
-            showlegend=False
+            showlegend=False,
+            plot_bgcolor='rgba(15, 23, 42, 0.8)',
+            paper_bgcolor='rgba(15, 23, 42, 0.8)',
+            font=dict(color='#cbd5e1')
         )
-        
+
         st.plotly_chart(fig_pie, use_container_width=True)
 
 # Row 5: Recent Events & Data Export
-st.markdown('<h2 class="sub-header">Recent Events & Data</h2>', unsafe_allow_html=True)
+st.markdown('<h2 class="sub-header">Recent Events and Data</h2>', unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["Recent Events", "Export Data"])
 
@@ -753,14 +1023,14 @@ with tab1:
     # Display recent events if available
     if 'recent_events' in data and data['recent_events']:
         recent_events_df = pd.DataFrame(data['recent_events'])
-        
+
         # Format the DataFrame for display
         display_df = recent_events_df.copy()
         if 'timestamp' in display_df.columns:
             display_df['timestamp'] = pd.to_datetime(display_df['timestamp'])
             display_df['Date'] = display_df['timestamp'].dt.strftime('%Y-%m-%d')
             display_df['Time'] = display_df['timestamp'].dt.strftime('%H:%M:%S')
-        
+
         # Select and order columns
         columns_to_show = []
         if 'Date' in display_df.columns:
@@ -773,13 +1043,13 @@ with tab1:
             columns_to_show.append('confidence_value')
         if 'status' in display_df.columns:
             columns_to_show.append('status')
-        
+
         if columns_to_show:
             display_df = display_df[columns_to_show]
             display_df.columns = [col.replace('type__name', 'Event Type')
-                                 .replace('confidence_value', 'Confidence/Count')
-                                 .replace('status', 'Status') for col in display_df.columns]
-            
+                                  .replace('confidence_value', 'Confidence/Count')
+                                  .replace('status', 'Status') for col in display_df.columns]
+
             st.dataframe(
                 display_df,
                 use_container_width=True,
@@ -801,7 +1071,7 @@ with tab1:
 
 with tab2:
     col1, col2 = st.columns([2, 1])
-    
+
     with col1:
         st.markdown("### Raw Data Preview")
         st.dataframe(
@@ -809,14 +1079,14 @@ with tab2:
             use_container_width=True,
             height=250
         )
-    
+
     with col2:
         st.markdown("### Export Options")
-        
+
         # Convert DataFrames to CSV
         daily_csv = daily_df.to_csv(index=False)
         hourly_csv = hourly_df.to_csv(index=False)
-        
+
         st.download_button(
             label="Download Daily Data (CSV)",
             data=daily_csv,
@@ -824,7 +1094,7 @@ with tab2:
             mime="text/csv",
             use_container_width=True
         )
-        
+
         st.download_button(
             label="Download Hourly Data (CSV)",
             data=hourly_csv,
@@ -832,7 +1102,7 @@ with tab2:
             mime="text/csv",
             use_container_width=True
         )
-        
+
         # Export as JSON
         json_data = json.dumps(data, indent=2)
         st.download_button(
@@ -848,10 +1118,14 @@ st.markdown("---")
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col1:
-    st.markdown(f"**Last Updated:** {datetime.now().strftime('%H:%M:%S')}")
+    st.markdown(
+        f"<div style='color: #94a3b8;'><strong>Last Updated:</strong> {datetime.now().strftime('%H:%M:%S')}</div>",
+        unsafe_allow_html=True)
 
 with col2:
-    st.markdown("**AI Surveillance Analytics Dashboard** - Real-time weapon and overcrowding detection monitoring")
+    st.markdown(
+        "<div style='color: #94a3b8; text-align: center;'><strong>AI Surveillance Analytics Dashboard</strong> - Real-time weapon and overcrowding detection monitoring</div>",
+        unsafe_allow_html=True)
 
 with col3:
     if st.button("Refresh Now", use_container_width=True):

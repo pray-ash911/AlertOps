@@ -133,6 +133,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Static files (CSS, JavaScript, Images served by Django in development)
 STATIC_URL = 'static/'
 
+# Directories where Django will look for static files
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
+
 # --- Media Files (User uploads like snapshots) ---
 import os
 # BASE_DIR is already defined at the top using Path: BASE_DIR = Path(__file__).resolve().parent.parent
@@ -151,3 +156,13 @@ USE_I18N = True
 # IMPORTANT: Always store datetime objects in the database as time-zone-aware (UTC).
 # Django will handle the conversion between UTC and TIME_ZONE for presentation.
 USE_TZ = True
+
+# REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
