@@ -83,9 +83,9 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'surveillance_db_new',  # You can name this anything
+        'NAME': 'surveillance_db_new',  
         'USER': 'postgres',       # Default superuser name
-        'PASSWORD': 'prayashhero123', # <-- **CHANGE THIS**
+        'PASSWORD': 'prayashhero123', 
         'HOST': 'localhost',
         'PORT': '5432',           # Default PostgreSQL port
     }

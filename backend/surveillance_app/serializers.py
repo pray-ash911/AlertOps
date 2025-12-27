@@ -42,10 +42,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
             is_staff=True,  # Make them admin/staff
-            is_superuser=True  # Make them superuser for full admin access
+            is_superuser=False  # Make them superuser for full admin access
         )
         return user
-
 
 class UserLoginSerializer(serializers.Serializer):
     """Serializer for user login - supports both email and username"""
@@ -94,11 +93,11 @@ class UserLoginSerializer(serializers.Serializer):
         except User.DoesNotExist:
             raise serializers.ValidationError('Invalid email/username or password.')
 
-
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for user information"""
     class Meta:
         model = User
         fields = ('id', 'username', 'email', 'first_name', 'last_name', 'is_staff', 'is_superuser')
         read_only_fields = ('id', 'is_staff', 'is_superuser')
+
 

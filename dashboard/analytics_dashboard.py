@@ -297,6 +297,21 @@ st.markdown("""
         0%, 100% { opacity: 1; }
         50% { opacity: 0.8; }
     }
+    /* Remove bright blue from all Streamlit widgets */
+    div[data-testid="stSlider"] > div > div,
+    div[data-testid="stRadio"] > div,
+    div[data-testid="stCheckbox"] > div {
+        background: rgba(15, 23, 42, 0.6) !important;
+        border: 1px solid rgba(0, 102, 255, 0.3) !important;
+}
+
+    img[src*="img_5.png"] {
+    box-shadow: none !important; /* Remove glow shadow */
+    border: 2px solid rgba(0, 102, 255, 0.3) !important; /* Keep subtle border */
+    filter: none !important; /* Remove drop-shadow filter */
+    border-radius: 12px;
+}
+    
 </style>
 """, unsafe_allow_html=True)
 
@@ -314,20 +329,16 @@ ANALYTICS_URL = f"{LOCAL_URL}/api/analytics/"
 
 # Title with Logo
 st.markdown(f"""
-<div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 2rem;">
-    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 10px;">
+<div style="margin-bottom: 2rem;">
+    <div style="display: flex; align-items: center; gap: 20px; margin: 0 0 10px 1rem;">
         <img src="{LOCAL_URL}/static/images/img_5.png" 
-             style="width: 80px; height: 80px; border-radius: 12px; 
+             style="width: 130px; height: 130px; border-radius: 12px; 
                     box-shadow: 0 0 25px rgba(0, 102, 255, 0.4); 
                     border: 2px solid rgba(0, 102, 255, 0.3);
                     filter: drop-shadow(0 0 15px rgba(0, 102, 255, 0.5));">
-        <h1 class="main-header" style="margin: 0; font-size: 2.8rem;">
+        <h1 class="main-header" style="margin: 0; font-size: 2.8rem; text-align: left; padding-left: 0;">
             Weapon and Overcrowding Detection Analytics Dashboard
         </h1>
-    </div>
-    <div style="color: #94a3b8; font-size: 1.1rem; font-weight: 500; text-align: center; 
-                margin-top: 10px; letter-spacing: 1px; text-transform: uppercase;">
-        Advanced Security Intelligence & Threat Analysis
     </div>
 </div>
 """, unsafe_allow_html=True)
