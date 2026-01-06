@@ -21,7 +21,7 @@ from .models import EventLog, EventType, EventEvidence, SurveillanceArea
 
 # --- REQUIRED IMPORTS AND MODEL INITIALIZATION ---
 
-# Initialize global variables (needed even if models fail to load)
+# Initialize global variables
 WEAPON_MODEL = None
 CROWD_MODEL = None
 WEAPON_EVENT_TYPE_OBJ = None
@@ -31,81 +31,78 @@ OVERCROWDING_EVENT_TYPE_ID = None
 
 try:
     from ultralytics import YOLO
+    import torch
+    import os
 
     print("Ultralytics YOLO imported successfully.")
-
-   # In your views.py, replace the model loading section:
 
     # --- MODEL 1: WEAPON DETECTION ---
     MODEL_FILE_NAME_WEAPON = 'best (1).pt'
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     MODEL_PATH_WEAPON = os.path.join(PROJECT_ROOT, 'models', MODEL_FILE_NAME_WEAPON)
 
-    import torch
+    # --- MODEL 2: OVERCROWDING DETECTION ---
+    MODEL_FILE_NAME_CROWD = 'yolov8m.pt'
+    MODEL_PATH_CROWD = os.path.join(PROJECT_ROOT, 'models', MODEL_FILE_NAME_CROWD)
 
-    # Check CUDA BEFORE loading models
+    # Check CUDA and set device
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
-    print(f"CUDA Available: {torch.cuda.is_available()}")
-    print(f"CUDA Version: {torch.version.cuda if torch.cuda.is_available() else 'N/A'}")
-    print(f"GPU Name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No GPU'}")
 
+    if torch.cuda.is_available():
+        print(f"CUDA Available: {torch.cuda.is_available()}")
+        print(f"CUDA Version: {torch.version.cuda}")
+        print(f"GPU Name: {torch.cuda.get_device_name(0)}")
+
+    # Load weapon detection model
     if not os.path.exists(MODEL_PATH_WEAPON):
         print(f"ERROR: Model file not found at: {MODEL_PATH_WEAPON}")
         WEAPON_MODEL = None
     else:
         try:
-            # Load model and immediately move to device
             WEAPON_MODEL = YOLO(MODEL_PATH_WEAPON)
-            WEAPON_MODEL.to(device)  # Force to GPU or CPU
+            WEAPON_MODEL.to(device)
             print(f"YOLO (Weapon Detection) Model loaded successfully on: {WEAPON_MODEL.device}")
-            print(f"Weapon Model Names: {WEAPON_MODEL.names}")
         except Exception as e:
             print(f"ERROR loading YOLO model: {e}")
             WEAPON_MODEL = None
 
-    # --- MODEL 2: OVERCROWDING DETECTION ---
-    MODEL_FILE_NAME_CROWD = 'yolov8m.pt'
-    MODEL_PATH_CROWD = os.path.join(PROJECT_ROOT, 'models', MODEL_FILE_NAME_CROWD)
-
+    # Load crowd detection model
     try:
-        # Load the model and move to device
         CROWD_MODEL = YOLO(MODEL_PATH_CROWD)
-        CROWD_MODEL.to(device)  # Force to same device
+        CROWD_MODEL.to(device)
         print(f"YOLO (Overcrowding Detection) Model loaded successfully on: {CROWD_MODEL.device}")
-        print(f"Crowd Model has {len(CROWD_MODEL.names)} classes")
     except Exception as e:
         print(f"ERROR loading YOLO crowd model: {e}")
         CROWD_MODEL = None
 
-
-    # Add verification after moving to GPU
-    import torch
+    # Verify GPU placement
     if torch.cuda.is_available():
-        WEAPON_MODEL.to('cuda:0')
-        # Verify
-        print(f"Weapon Model device: {WEAPON_MODEL.device}")
-        print(f"Is model on GPU?: {next(WEAPON_MODEL.model.parameters()).device}")
+        print(f"Weapon Model on GPU: {next(WEAPON_MODEL.model.parameters()).device}")
+        if CROWD_MODEL:
+            print(f"Crowd Model on GPU: {next(CROWD_MODEL.model.parameters()).device}")
 
-   # --- CONFIGURATION FOR WEAPON DETECTION ---
-    INFERENCE_SKIP_FRAMES = 0  # Process EVERY frame for maximum detection
-    FIREARM_KEYWORDS = ['gun', 'pistol', 'handgun', 'rifle', 'firearm', 'weapon']
-    BLADE_KEYWORDS = ['knife', 'sword', 'blade', 'dagger']
+    # --- CONFIGURATION FOR WEAPON DETECTION ---
+    INFERENCE_SKIP_FRAMES = 0  # Process EVERY frame
+    FIREARM_KEYWORDS = ['gun', 'pistol', 'handgun', 'rifle', 'firearm', 'revolver', 'shotgun']
+    BLADE_KEYWORDS = ['knife', 'dagger', 'machete', 'sword', 'blade']
     WEAPON_KEYWORDS = FIREARM_KEYWORDS + BLADE_KEYWORDS
 
-    # CRITICAL: LOWER THESE VALUES FOR REAL-WORLD DETECTION
-    WEAPON_LOG_CONFIDENCE = 0.25  # Confidence for logging to database
-    WEAPON_DETECTION_CONFIDENCE = 0.20  # Confidence for real-time display
+    # Detection thresholds
+    WEAPON_LOG_CONFIDENCE = 0.70
+    WEAPON_DETECTION_CONFIDENCE = 0.75
     LOG_COOLDOWN_SECONDS = 3
 
     # --- CONFIGURATION FOR OVERCROWDING DETECTION ---
-    OVERCROWDING_THRESHOLD = 3  # Start with very low threshold
-    CROWD_CONFIDENCE_THRESHOLD = 0.25  # People need lower confidence
+    OVERCROWDING_THRESHOLD = 3
+    CROWD_CONFIDENCE_THRESHOLD = 0.25
     CROWD_LOG_COOLDOWN_SECONDS = 15
 
-    # In your detection loop, add debugging:
-    print(f"Weapon Model Names: {list(WEAPON_MODEL.names.values())}")
-    print(f"Crowd Model Names: {list(CROWD_MODEL.names.values())}")
+    # Debug info
+    if WEAPON_MODEL:
+        print(f"Weapon Model Names: {list(WEAPON_MODEL.names.values())}")
+    if CROWD_MODEL:
+        print(f"Crowd Model Names: {list(CROWD_MODEL.names.values())}")
 
 except Exception as e:
     WEAPON_MODEL = None
@@ -115,8 +112,16 @@ except Exception as e:
     OVERCROWDING_EVENT_TYPE_OBJ = None
     OVERCROWDING_EVENT_TYPE_ID = None
     print(f"CRITICAL ERROR initializing YOLO models: {e}")
+    import traceback
+
     traceback.print_exc()
 
+
+if WEAPON_MODEL:
+    print("\n=== WEAPON MODEL CLASSES ===")
+    for idx, name in WEAPON_MODEL.names.items():
+        print(f"  Class {idx}: '{name}'")
+    print("=============================\n")
 
 # --- NEW: Helper function to get or create the 'WEAPON' EventType ---
 def get_or_create_weapon_event_type():
@@ -125,15 +130,15 @@ def get_or_create_weapon_event_type():
     creating it if it doesn't exist. This function should be called only
     when needed, after Django has initialized the database connection.
     """
-    global WEAPON_EVENT_TYPE_OBJ, WEAPON_EVENT_TYPE_ID # Access the global variables
+    global WEAPON_EVENT_TYPE_OBJ, WEAPON_EVENT_TYPE_ID  # Access the global variables
     try:
-        if WEAPON_EVENT_TYPE_OBJ is None: # Only fetch/create if not already done
+        if WEAPON_EVENT_TYPE_OBJ is None:  # Only fetch/create if not already done
             weapon_event_type, created = EventType.objects.get_or_create(
                 name='WEAPON',
                 defaults={'description': 'A weapon (e.g., gun, knife) has been detected.'}
             )
-            WEAPON_EVENT_TYPE_OBJ = weapon_event_type # Store the object
-            WEAPON_EVENT_TYPE_ID = weapon_event_type.type_id # Store the ID
+            WEAPON_EVENT_TYPE_OBJ = weapon_event_type  # Store the object
+            WEAPON_EVENT_TYPE_ID = weapon_event_type.type_id  # Store the ID
             if created:
                 print(f"Created new EventType: {weapon_event_type.name} (ID: {WEAPON_EVENT_TYPE_ID})")
             else:
@@ -152,15 +157,15 @@ def get_or_create_overcrowding_event_type():
     creating it if it doesn't exist. This function should be called only
     when needed, after Django has initialized the database connection.
     """
-    global OVERCROWDING_EVENT_TYPE_OBJ, OVERCROWDING_EVENT_TYPE_ID # Access the global variables
+    global OVERCROWDING_EVENT_TYPE_OBJ, OVERCROWDING_EVENT_TYPE_ID  # Access the global variables
     try:
-        if OVERCROWDING_EVENT_TYPE_OBJ is None: # Only fetch/create if not already done
+        if OVERCROWDING_EVENT_TYPE_OBJ is None:  # Only fetch/create if not already done
             overcrowding_event_type, created = EventType.objects.get_or_create(
                 name='OVERCROWDING',
                 defaults={'description': 'The number of people in the area exceeds the defined threshold.'}
             )
-            OVERCROWDING_EVENT_TYPE_OBJ = overcrowding_event_type # Store the object
-            OVERCROWDING_EVENT_TYPE_ID = overcrowding_event_type.type_id # Store the ID
+            OVERCROWDING_EVENT_TYPE_OBJ = overcrowding_event_type  # Store the object
+            OVERCROWDING_EVENT_TYPE_ID = overcrowding_event_type.type_id  # Store the ID
             if created:
                 print(f"Created new EventType: {overcrowding_event_type.name} (ID: {OVERCROWDING_EVENT_TYPE_ID})")
             else:
@@ -256,18 +261,61 @@ def generate_frames():
     Python generator function that continuously captures and processes
     frames using the WEAPON_MODEL for real-time weapon detection
     and the CROWD_MODEL for real-time overcrowding detection.
-
-    Includes frame skipping for performance.
     """
-    # NOTE: (The implementation of generate_frames remains the same, but the
-    # call to send_ifttt_alert is replaced by send_google_form_alert below.)
+    # --- ADDED: Exclusion list to prevent false positives ---
+    EXCLUDE_KEYWORDS = [
+        'bottle', 'cell phone', 'phone', 'remote', 'banana',
+        'scissors', 'toothbrush', 'tooth', 'brush', 'water bottle',
+        'bottle of water', 'cup', 'glass', 'mug', 'can', 'container',
+        'pencil', 'pen', 'marker', 'crayon', 'ruler', 'eraser',  # Writing instruments
+        'spoon', 'fork', 'chopstick', 'straw',  # Utensils
+        'key', 'keychain', 'wallet', 'card',  # Personal items
+        'flashlight', 'remote control', 'comb', 'hairbrush'  # Misc
+    ]
 
-    if WEAPON_MODEL is None or CROWD_MODEL is None: # Check if both models are available first
+    def is_valid_weapon(class_name, confidence, box_area=None):
+        """Enhanced weapon validation with multiple checks"""
+        class_lower = class_name.lower()
+
+        # 1. First exclude all common false positives
+        for exclude in EXCLUDE_KEYWORDS:
+            if exclude in class_lower:
+                print(f"Excluding false positive: '{class_name}' (matches '{exclude}')")
+                return False
+
+        # 2. Check for actual weapons with stricter matching
+        weapon_keywords = FIREARM_KEYWORDS + BLADE_KEYWORDS
+        for weapon in weapon_keywords:
+            # Use stricter matching - require exact word or close match
+            if weapon in class_lower:
+                # For knife/dagger detection, require higher confidence
+                if weapon in ['knife', 'dagger'] and confidence < 0.70:
+                    print(f"Low confidence for {weapon}: {confidence:.2f}")
+                    return False
+                return True
+
+        # 3. Generic 'weapon' requires very high confidence
+        if 'weapon' in class_lower:
+            if confidence > 0.88:  # Very high threshold for generic
+                print(f"Generic weapon with high confidence: {confidence:.2f}")
+                return True
+            return False
+
+        # 4. Size-based filtering (if box area provided)
+        if box_area:
+            # Knives should have reasonable aspect ratio (longer than wide)
+            # You can add more sophisticated shape analysis here
+            if box_area < 200:  # Too small to be a real weapon
+                print(f"Too small: {box_area}px")
+                return False
+
+        return False
+
+    if WEAPON_MODEL is None or CROWD_MODEL is None:
         print("Model(s) not available. Exiting stream.")
-        # Yield an error frame instead of returning
         error_img = np.zeros((480, 640, 3), dtype=np.uint8)
         cv2.putText(error_img, "Models not loaded", (50, 240),
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         error_frame = cv2.imencode('.jpg', error_img)[1].tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + error_frame + b'\r\n')
@@ -278,25 +326,21 @@ def generate_frames():
     overcrowding_event_type_obj = get_or_create_overcrowding_event_type()
     if weapon_event_type_obj is None or overcrowding_event_type_obj is None:
         print("ERROR: Could not get/create EventTypes. Exiting stream.")
-        # Yield an error frame
         error_img = np.zeros((480, 640, 3), dtype=np.uint8)
         cv2.putText(error_img, "EventTypes not available", (50, 240),
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         error_frame = cv2.imencode('.jpg', error_img)[1].tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + error_frame + b'\r\n')
-        return # Exit the stream if EventType is unavailable
+        return
 
     # 💡 FIX: Explicitly use DirectShow backend for stability on Windows
-    # (CAP_DSHOW = 700, the preferred value for reliability on Windows/MSMF issues)
-    # Try multiple camera indices to find an available camera
     camera = None
-    for camera_index in range(3):  # Try indices 0, 1, 2
+    for camera_index in range(3):
         test_camera = None
         try:
             test_camera = cv2.VideoCapture(camera_index + cv2.CAP_DSHOW)
             if test_camera.isOpened():
-                # Test if we can actually read a frame
                 ret, _ = test_camera.read()
                 if ret:
                     camera = test_camera
@@ -312,29 +356,26 @@ def generate_frames():
 
     if camera is None or not camera.isOpened():
         print("CRITICAL: No camera available at any index (0, 1, or 2). Stopping stream.")
-        # Yield an error frame showing camera unavailable
         error_img = np.zeros((480, 640, 3), dtype=np.uint8)
         cv2.putText(error_img, "Camera Unavailable", (150, 200),
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         cv2.putText(error_img, "Please check camera connection", (100, 250),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         cv2.putText(error_img, "Tried indices: 0, 1, 2", (100, 300),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         error_frame = cv2.imencode('.jpg', error_img)[1].tobytes()
-        while True:  # Keep yielding error frame
+        while True:
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + error_frame + b'\r\n')
-            time.sleep(1)  # Yield error frame every second
+            time.sleep(1)
         return
 
-    last_annotated_frame = None  # Stores the last frame annotated by the model
+    last_annotated_frame = None
     frame_count = 0
-    TARGET_FRAME_TIME_MS = 100  # Target 10 FPS
+    TARGET_FRAME_TIME_MS = 100
 
     last_weapon_alert_time = 0
-    last_crowd_alert_time = 0 # Track last overcrowding alert time
-
-    SNAPSHOT_DIR_NAME = ''  # No subfolder, save directly in MEDIA_ROOT
+    last_crowd_alert_time = 0
 
     while True:
         start_time = time.time()
@@ -346,35 +387,61 @@ def generate_frames():
             break
 
         current_frame_for_display = frame.copy()
-        alert_triggered = False # Track if any alert was just logged in this cycle
-        person_count = 0 # Initialize person count for this frame
+        alert_triggered = False
+        person_count = 0
 
         frame_count += 1
-        # Determine if we run the expensive inference step
         run_inference = (frame_count % (INFERENCE_SKIP_FRAMES + 1)) == 0
 
         # --- Detection and Annotation Logic ---
         try:
-
             if run_inference:
-                # --- RUN EXPENSIVE YOLO INFERENCE FOR WEAPON ---
-                weapon_results = WEAPON_MODEL.predict(frame, verbose=False, conf=WEAPON_LOG_CONFIDENCE)
+                # --- RUN EXPENSIVE YOLO INFERENCE FOR WEAPON (with improved parameters) ---
+                weapon_results = WEAPON_MODEL.predict(
+                    frame,
+                    verbose=False,
+                    conf=WEAPON_LOG_CONFIDENCE,
+                    iou=0.45,  # Stricter NMS to reduce overlapping detections
+                    agnostic_nms=True  # Class-agnostic NMS
+                )
 
                 # --- RUN EXPENSIVE YOLO INFERENCE FOR CROWD (People) ---
-                crowd_results = CROWD_MODEL.predict(frame, verbose=False, conf=0.25) # Lower confidence for people detection
+                crowd_results = CROWD_MODEL.predict(
+                    frame,
+                    verbose=False,
+                    conf=0.25
+                )
 
-                # Use the model's built-in plotting to create the annotated frame
-                # Combine the annotations from both models if possible, or use one.
-                # For simplicity, let's use the weapon model's annotation if it has detections, otherwise use crowd model's.
                 if weapon_results and weapon_results[0] and len(weapon_results[0].boxes) > 0:
                     last_annotated_frame = weapon_results[0].plot()
                 elif crowd_results and crowd_results[0] and len(crowd_results[0].boxes) > 0:
-                    last_annotated_frame = crowd_results[0].plot()
+                    # Filter to show only person boxes
+                    person_detections = []
+                    boxes = crowd_results[0].boxes
+
+                    for i in range(len(boxes)):
+                        if int(boxes.cls[i].item()) == 0:  # Only person
+                            person_detections.append({
+                                'box': boxes.xyxy[i].cpu().numpy(),
+                                'conf': boxes.conf[i].item(),
+                                'cls': 0
+                            })
+
+                    if person_detections:
+                        # Create custom annotation with only people
+                        annotated = frame.copy()
+                        for det in person_detections:
+                            x1, y1, x2, y2 = map(int, det['box'])
+                            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                            cv2.putText(annotated, f"Person: {det['conf']:.2f}",
+                                        (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        last_annotated_frame = annotated
+                    else:
+                        last_annotated_frame = current_frame_for_display.copy()
                 else:
-                    # If no results from either model, use the raw frame as the last annotated frame
                     last_annotated_frame = current_frame_for_display.copy()
 
-            # --- APPLY ANNOTATIONS (Use the last known annotated frame or the current raw frame) ---
+            # --- APPLY ANNOTATIONS ---
             if last_annotated_frame is not None:
                 current_frame_for_display = last_annotated_frame.copy()
 
@@ -387,11 +454,32 @@ def generate_frames():
                     weapon_classes = weapon_results[0].boxes.cls.int().cpu().tolist()
                     weapon_names = WEAPON_MODEL.names
 
+                    # --- ADDED: Get bounding boxes for size filtering ---
+                    boxes = weapon_results[0].boxes.xyxy.cpu().numpy()
+
                     # Check for any weapon detection
-                    for conf, cls in zip(weapon_confs, weapon_classes):
+                    for idx, (conf, cls) in enumerate(zip(weapon_confs, weapon_classes)):
                         class_name = weapon_names.get(cls, "unknown").lower()
 
-                        if any(keyword in class_name for keyword in WEAPON_KEYWORDS):
+                        # --- CHANGED: Use improved validation instead of simple keyword check ---
+                        if is_valid_weapon(class_name, conf):
+                            # --- ADDED: Optional size filtering ---
+                            if idx < len(boxes):
+                                x1, y1, x2, y2 = boxes[idx]
+                                width = x2 - x1
+                                height = y2 - y1
+                                area = width * height
+
+                                # Filter by reasonable size (adjust based on your camera resolution)
+                                MIN_AREA = 300  # Minimum pixel area for a weapon
+                                MAX_AREA = 50000  # Maximum pixel area
+
+                                if area < MIN_AREA:
+                                    print(f"Skipping {class_name} - too small: {area:.0f}px")
+                                    continue
+                                if area > MAX_AREA:
+                                    print(f"Skipping {class_name} - too large: {area:.0f}px")
+                                    continue
 
                             # --- STANDARDIZE LABEL FOR LOGGING ---
                             final_weapon_type = "UNKNOWN_WEAPON"
@@ -403,120 +491,110 @@ def generate_frames():
                             label = f"WEAPON_{final_weapon_type}"
 
                             # --- LOGGING CHECK: WEAPON DETECTED (Cooldown enforced) ---
-                            # Only log if no other alert (like overcrowding) was just logged in this cycle
                             if current_time - last_weapon_alert_time > LOG_COOLDOWN_SECONDS and not alert_triggered:
-                                # --- FILE PATH HANDLING (Using MEDIA_ROOT logic for persistence) ---
-                                SNAPSHOT_FULL_PATH = settings.MEDIA_ROOT  # Save directly in MEDIA_ROOT
+                                # --- FILE PATH HANDLING ---
+                                SNAPSHOT_FULL_PATH = settings.MEDIA_ROOT
                                 os.makedirs(SNAPSHOT_FULL_PATH, exist_ok=True)
 
                                 filename = f"{label}_{int(current_time)}.jpg"
-                                filepath = os.path.join(SNAPSHOT_FULL_PATH, filename)  # Full path on the server
-                                db_snapshot_path = filename  # Store only the filename, MEDIA_URL handles the path
+                                filepath = os.path.join(SNAPSHOT_FULL_PATH, filename)
+                                db_snapshot_path = filename
 
                                 # Log the snapshot of the annotated frame
                                 cv2.imwrite(filepath, current_frame_for_display)
 
-                                # --- NEW: Log to EventLog and EventEvidence models for WEAPON ---
-                                # 1. Create the main EventLog entry
+                                # --- Log to EventLog and EventEvidence models for WEAPON ---
                                 event_log = EventLog.objects.create(
-                                    type=weapon_event_type_obj,  # Use the EventType object obtained via the helper function
-                                    # area=None, # Optional: Link to a SurveillanceArea if applicable
+                                    type=weapon_event_type_obj,
                                     timestamp=timezone.now(),
-                                    confidence_value=conf,  # Store the confidence score
-                                    # status defaults to 'NEW'
+                                    confidence_value=conf,
                                 )
 
-                                # 2. Create the EventEvidence entry linked to the EventLog
                                 EventEvidence.objects.create(
-                                    log=event_log,  # Link to the EventLog just created
-                                    file_path=db_snapshot_path,  # Store the relative path
-                                    file_type='image/jpeg'  # Specify the file type
+                                    log=event_log,
+                                    file_path=db_snapshot_path,
+                                    file_type='image/jpeg'
                                 )
 
                                 print(
-                                    f"Logged {label} event (Log ID: {event_log.log_id}): {db_snapshot_path}, Confidence: {conf:.2f}")
+                                    f" Logged {label} event (Log ID: {event_log.log_id}): {db_snapshot_path}, Confidence: {conf:.2f}")
 
-                                # --- GOOGLE FORMS ALERT TRIGGER (NEW) for WEAPON ---
+                                # --- GOOGLE FORMS ALERT TRIGGER for WEAPON ---
                                 send_google_form_alert(db_snapshot_path, label, conf)
 
                                 last_weapon_alert_time = current_time
-                                alert_triggered = True # Prevent overcrowding alert from triggering in this cycle if one just happened
+                                alert_triggered = True
 
                             # Overlay primary system alert message for weapon
                             cv2.putText(current_frame_for_display, f"!!! {label} DETECTED !!!", (10, 50),
                                         cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 4)
+                        else:
+                            # --- ADDED: Debug output for non-weapon detections ---
+                            if conf > 0.6:  # Only show high confidence non-weapons
+                                cv2.putText(current_frame_for_display, f"Detected: {class_name} ({conf:.2f})",
+                                            (10, current_frame_for_display.shape[0] - 60),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 165, 0), 1)
 
                 # --- PROCESS CROWD RESULTS (People Counting) ---
                 if crowd_results and crowd_results[0].boxes:
-                    crowd_confs = crowd_results[0].boxes.conf.cpu().numpy()
                     crowd_classes = crowd_results[0].boxes.cls.int().cpu().tolist()
                     crowd_names = CROWD_MODEL.names
 
                     # --- COUNT PEOPLE FOR OVERCROWDING ---
                     for cls in crowd_classes:
-                        class_name = crowd_names.get(cls, "unknown").lower()
-                        if class_name == 'person': # Count all detected persons
+                        if cls == 0:  # Class ID 0 is 'person'
                             person_count += 1
 
                     # --- CHECK FOR OVERCROWDING ALERT (Lower Priority) ---
-                    # Only check/log crowd if no weapon alert was just logged in this cycle
                     if person_count > OVERCROWDING_THRESHOLD and not alert_triggered:
                         if current_time - last_crowd_alert_time > CROWD_LOG_COOLDOWN_SECONDS:
                             crowd_label = 'OVERCROWDING'
 
-                            # --- FILE PATH HANDLING (Using MEDIA_ROOT logic for persistence) ---
-                            SNAPSHOT_FULL_PATH = settings.MEDIA_ROOT  # Save directly in MEDIA_ROOT
+                            # --- FILE PATH HANDLING ---
+                            SNAPSHOT_FULL_PATH = settings.MEDIA_ROOT
                             os.makedirs(SNAPSHOT_FULL_PATH, exist_ok=True)
 
-                            filename = f"{crowd_label}{person_count}{int(current_time)}.jpg" # Include count in filename
-                            filepath = os.path.join(SNAPSHOT_FULL_PATH, filename)  # Full path on the server
-                            db_snapshot_path = filename  # Store only the filename, MEDIA_URL handles the path
+                            filename = f"{crowd_label}{person_count}{int(current_time)}.jpg"
+                            filepath = os.path.join(SNAPSHOT_FULL_PATH, filename)
+                            db_snapshot_path = filename
 
-                            # Log the snapshot of the annotated frame showing the crowd
                             cv2.imwrite(filepath, current_frame_for_display)
 
-                            # --- NEW: Log to EventLog and EventEvidence models for OVERCROWDING ---
-                            # 1. Create the main EventLog entry for OVERCROWDING
-                            # NOTE: confidence_value stores the COUNT for overcrowding
+                            # --- Log to EventLog and EventEvidence models for OVERCROWDING ---
                             event_log = EventLog.objects.create(
-                                type=overcrowding_event_type_obj,  # Use the OVERCROWDING EventType object
-                                # area=None, # Optional: Link to a SurveillanceArea if applicable later
+                                type=overcrowding_event_type_obj,
                                 timestamp=timezone.now(),
-                                confidence_value=person_count,  # Store the count
-                                # status defaults to 'NEW'
+                                confidence_value=person_count,
                             )
 
-                            # 2. Create the EventEvidence entry linked to the EventLog
                             EventEvidence.objects.create(
-                                log=event_log,  # Link to the EventLog just created
-                                file_path=db_snapshot_path,  # Store the relative path
-                                file_type='image/jpeg'  # Specify the file type
+                                log=event_log,
+                                file_path=db_snapshot_path,
+                                file_type='image/jpeg'
                             )
 
                             print(
-                                f"Logged {crowd_label} event (Log ID: {event_log.log_id}): {db_snapshot_path}, Count: {person_count}")
+                                f"✅ Logged {crowd_label} event (Log ID: {event_log.log_id}): {db_snapshot_path}, Count: {person_count}")
 
-                            # --- GOOGLE FORMS ALERT TRIGGER (NEW) for OVERCROWDING ---
+                            # --- GOOGLE FORMS ALERT TRIGGER for OVERCROWDING ---
                             send_google_form_alert(db_snapshot_path, crowd_label, person_count)
 
                             last_crowd_alert_time = current_time
-                            alert_triggered = True # Prevent weapon alert from triggering in this cycle if one just happened
+                            alert_triggered = True
 
                         # Overlay primary system alert message for overcrowding
-                        cv2.putText(current_frame_for_display, f"!!! OVERCROWDING: {person_count}/{OVERCROWDING_THRESHOLD} !!!", (10, 100), # Changed position
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 3) # Different color/font size
-
+                        cv2.putText(current_frame_for_display,
+                                    f"!!! OVERCROWDING: {person_count}/{OVERCROWDING_THRESHOLD} !!!",
+                                    (10, 100),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 3)
 
             # --- Display Current Person Count (Always) ---
-            # Show the current count on the video feed, regardless of alerts
             cv2.putText(current_frame_for_display,
                         f"People: {person_count} (Threshold: {OVERCROWDING_THRESHOLD})",
-                        (10, current_frame_for_display.shape[0] - 20), # Position at bottom
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2) # White text
-
+                        (10, current_frame_for_display.shape[0] - 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
             # Annotate the display frame if a non-logging alert was recently triggered
-            # (This might be less relevant now with two types, but keep for weapon if needed)
             if not alert_triggered and 'last_weapon_alert_time' in locals() and current_time - last_weapon_alert_time < LOG_COOLDOWN_SECONDS:
                 cv2.putText(current_frame_for_display, f"!!! RECENT WEAPON ALERT !!!", (10, 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 165, 255), 4)
@@ -524,10 +602,8 @@ def generate_frames():
         except Exception as e:
             print(f"YOLO Frame processing error: {e}")
             traceback.print_exc()
-
-            # Annotate the display frame to show the error
-            cv2.putText(current_frame_for_display, "MODEL ERROR", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255),
-                        4)
+            cv2.putText(current_frame_for_display, "MODEL ERROR", (10, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 4)
 
         # --- Encode the processed frame to JPEG ---
         ret, buffer = cv2.imencode('.jpg', current_frame_for_display, [cv2.IMWRITE_JPEG_QUALITY, 70])
@@ -575,7 +651,8 @@ def event_logs_view(request):
         # Query EventLog entries, joining with EventType and prefetching EventEvidence
         # Order by timestamp descending, limit to last 100
         # Use prefetch_related for the reverse foreign key (EventLog -> EventEvidence)
-        events = EventLog.objects.select_related('type', 'area').prefetch_related('evidence').all().order_by('-timestamp')[:100]
+        events = EventLog.objects.select_related('type', 'area').prefetch_related('evidence').all().order_by(
+            '-timestamp')[:100]
 
         data = []
         for event in events:
@@ -587,7 +664,7 @@ def event_logs_view(request):
             snapshot_url = None
             snapshot_path = None
             if evidence:
-                snapshot_path = evidence.file_path # Get the relative path from EventEvidence
+                snapshot_path = evidence.file_path  # Get the relative path from EventEvidence
                 # --- Generate public snapshot URL for dashboard (NEW) ---
                 if NGROK_URL != "https://YOUR-COPIED-NGROK-URL-HERE" and NGROK_URL != "YOUR_NGROK_OR_PUBLIC_URL_HERE":
                     safe_path = urllib.parse.quote(snapshot_path)
@@ -597,7 +674,8 @@ def event_logs_view(request):
                 'id': event.log_id,  # Use the primary key from EventLog
                 'timestamp': local_timestamp.isoformat(),
                 'label': event.type.name,  # Get the name from the related EventType
-                'confidence': event.confidence_value,  # Use confidence_value from EventLog (Conf for WEAPON, Count for CROWD)
+                'confidence': event.confidence_value,
+                # Use confidence_value from EventLog (Conf for WEAPON, Count for CROWD)
                 'snapshot_url': snapshot_url,
                 'snapshot_path': snapshot_path,  # Include the path from EventEvidence
             })
@@ -637,7 +715,7 @@ def get_latest_status(request):
                 message_details = f"Count: {int(latest_event.confidence_value)}"
 
             status_data = {
-                'status_level': 'ALERT',  # ✅ FIXED - consistent single quotes
+                'status_level': 'ALERT',  # FIXED - consistent single quotes
                 'message': f"!!! {event_type_name} DETECTED at {local_timestamp.strftime('%H:%M:%S')} ({message_details}) !!!",
                 'confidence': latest_event.confidence_value
             }
@@ -675,7 +753,7 @@ def analytics_view(request):
     try:
         # Calculate the date 30 days ago
         thirty_days_ago = timezone.now() - timedelta(days=30)
-        
+
         # Query EventLog for the last 30 days, filter by WEAPON and OVERCROWDING types
         events = EventLog.objects.filter(
             timestamp__gte=thirty_days_ago,
@@ -685,14 +763,14 @@ def analytics_view(request):
         ).values('date', 'type__name').annotate(
             count=Count('log_id')
         ).order_by('date', 'type__name')
-        
+
         # Prepare data for JSON response
         data = {}
         for event in events:
             date_str = event['date'].strftime('%Y-%m-%d')  # Format as date only
             event_type = event['type__name']
             count = event['count']
-            
+
             if date_str not in data:
                 data[date_str] = {'date': date_str, 'weapon': 0, 'overcrowding': 0, 'total_detections': 0}
 
@@ -702,13 +780,13 @@ def analytics_view(request):
             elif event_type == 'OVERCROWDING':
                 data[date_str]['overcrowding'] = count
                 data[date_str]['total_detections'] += count
-        
+
         # Convert to list and sort by date
         result = sorted(data.values(), key=lambda x: x['date'])
-        
+
         # Get hourly data (last 7 days)
         seven_days_ago = timezone.now() - timedelta(days=7)
-        
+
         # Get weapon events for hourly data
         weapon_hourly = EventLog.objects.filter(
             timestamp__gte=seven_days_ago,
@@ -718,7 +796,7 @@ def analytics_view(request):
         }).values('hour').annotate(
             count=Count('log_id')
         ).order_by('hour')
-        
+
         # Get overcrowding events for hourly data
         crowd_hourly = EventLog.objects.filter(
             timestamp__gte=seven_days_ago,
@@ -728,24 +806,24 @@ def analytics_view(request):
         }).values('hour').annotate(
             count=Count('log_id')
         ).order_by('hour')
-        
+
         # Prepare hourly data structure
         hourly_data = []
         for hour in range(24):
             weapon_count = next((item['count'] for item in weapon_hourly if int(item['hour']) == hour), 0)
             crowd_count = next((item['count'] for item in crowd_hourly if int(item['hour']) == hour), 0)
-            
+
             hourly_data.append({
                 'hour': hour,
                 'weapon': weapon_count,
                 'overcrowding': crowd_count,
                 'total': weapon_count + crowd_count
             })
-        
+
         # Calculate summary statistics
         total_weapons = sum(item['weapon'] for item in result)
         total_overcrowding = sum(item['overcrowding'] for item in result)
-        
+
         # Find peak hour
         if hourly_data:
             peak_hour_item = max(hourly_data, key=lambda x: x['total'])
@@ -756,7 +834,7 @@ def analytics_view(request):
             peak_hour = 14  # Default peak hour
             peak_weapon = 0
             peak_crowd = 0
-        
+
         # Get recent events
         recent_events = EventLog.objects.filter(
             timestamp__gte=thirty_days_ago
@@ -767,33 +845,33 @@ def analytics_view(request):
             'confidence_value',
             'status'
         )
-        
+
         # Convert timestamps to string format
         recent_events_list = []
         for event in recent_events:
             event_dict = dict(event)
             event_dict['timestamp'] = event_dict['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
             recent_events_list.append(event_dict)
-        
+
         # Get today's counts
         today = timezone.now().date()
         today_weapon = EventLog.objects.filter(
             timestamp__date=today,
             type__name='WEAPON'
         ).count()
-        
+
         today_crowd = EventLog.objects.filter(
             timestamp__date=today,
             type__name='OVERCROWDING'
         ).count()
-        
+
         # Get event type distribution
         type_distribution = EventLog.objects.filter(
             timestamp__gte=thirty_days_ago
         ).values('type__name').annotate(
             count=Count('log_id')
         )
-        
+
         response_data = {
             'daily_analytics': result,
             'hourly_analytics': hourly_data,
@@ -816,9 +894,9 @@ def analytics_view(request):
                 'today_crowd': today_crowd
             }
         }
-        
+
         return JsonResponse(response_data, safe=False, status=status.HTTP_200_OK)
-        
+
     except Exception as e:
         print(f"Error in analytics_view: {str(e)}")
         import traceback
@@ -855,13 +933,13 @@ def generate_sample_daily_data():
     """Generate sample daily analytics data for testing"""
     import random
     from datetime import datetime, timedelta
-    
+
     analytics_data = []
     end_date = datetime.now().date()
-    
+
     for i in range(30):
-        date = end_date - timedelta(days=30-i-1)
-        
+        date = end_date - timedelta(days=30 - i - 1)
+
         # Generate realistic data with patterns
         # Weekends have more events
         if date.weekday() in [4, 5]:  # Friday, Saturday
@@ -875,28 +953,28 @@ def generate_sample_daily_data():
         else:
             weapon = random.randint(0, 3)
             crowd = random.randint(2, 8)
-        
+
         # Add some trend
         if i > 20:  # Last 10 days
             weapon += random.randint(0, 2)
             crowd += random.randint(0, 5)
-        
+
         analytics_data.append({
             'date': date.strftime('%Y-%m-%d'),
             'weapon': weapon,
             'overcrowding': crowd,
             'total_detections': weapon + crowd
         })
-    
+
     return analytics_data
 
 
 def generate_sample_hourly_data():
     """Generate sample hourly data for testing"""
     import random
-    
+
     hourly_data = []
-    
+
     for hour in range(24):
         # Peak hours 9 AM to 9 PM
         if 9 <= hour <= 21:
@@ -906,14 +984,14 @@ def generate_sample_hourly_data():
         else:
             weapon = random.randint(0, 1)
             crowd = random.randint(0, 3)
-        
+
         hourly_data.append({
             'hour': hour,
             'weapon': weapon,
             'overcrowding': crowd,
             'total': weapon + crowd
         })
-    
+
     return hourly_data
 
 
@@ -921,20 +999,20 @@ def generate_sample_recent_events():
     """Generate sample recent events for testing"""
     import random
     from datetime import datetime, timedelta
-    
+
     recent_events = []
     event_types = ['WEAPON', 'OVERCROWDING']
     statuses = ['NEW', 'REVIEWED', 'CLOSED']
-    
+
     for i in range(10):
         event_time = datetime.now() - timedelta(hours=random.randint(0, 72))
         event_type = random.choice(event_types)
-        
+
         if event_type == 'WEAPON':
             confidence = round(random.uniform(0.65, 0.95), 2)
         else:
             confidence = random.randint(5, 25)  # Count for overcrowding
-        
+
         recent_events.append({
             'log_id': 1000 + i,
             'timestamp': event_time.strftime('%Y-%m-%d %H:%M:%S'),
@@ -942,7 +1020,7 @@ def generate_sample_recent_events():
             'confidence_value': confidence,
             'status': random.choice(statuses)
         })
-    
+
     return recent_events
 
 
@@ -959,7 +1037,7 @@ from .serializers import UserRegistrationSerializer, UserLoginSerializer, UserSe
 def register_view(request):
     """
     Register a new admin user.
-    
+
     GET /api/register/ - Redirects to registration page
     POST /api/register/
     Body: {
@@ -974,9 +1052,9 @@ def register_view(request):
     if request.method == 'GET':
         from django.shortcuts import redirect
         return redirect('register_page')
-    
+
     serializer = UserRegistrationSerializer(data=request.data)
-    
+
     if serializer.is_valid():
         user = serializer.save()
         # Don't auto-login, redirect to login page
@@ -987,7 +1065,7 @@ def register_view(request):
             'user': user_data,
             'redirect': '/login/'
         }, status=status.HTTP_201_CREATED)
-    
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -996,7 +1074,7 @@ def register_view(request):
 def login_view(request):
     """
     Login an admin user.
-    
+
     GET /api/login/ - Redirects to login page
     POST /api/login/
     Body: {
@@ -1007,13 +1085,13 @@ def login_view(request):
     if request.method == 'GET':
         from django.shortcuts import redirect
         return redirect('login_page')
-    
+
     serializer = UserLoginSerializer(data=request.data, context={'request': request})
-    
+
     if serializer.is_valid():
         user = serializer.validated_data['user']
         login(request, user)
-        
+
         # Return user info with redirect to dashboard
         user_data = UserSerializer(user).data
         return Response({
@@ -1021,7 +1099,7 @@ def login_view(request):
             'user': user_data,
             'redirect': '/dashboard/'  # Redirect to Streamlit dashboard
         }, status=status.HTTP_200_OK)
-    
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -1030,7 +1108,7 @@ def login_view(request):
 def logout_view(request):
     """
     Logout the current user.
-    
+
     POST /api/logout/
     Requires authentication.
     """
@@ -1043,7 +1121,7 @@ def logout_view(request):
 def current_user_view(request):
     """
     Get current authenticated user information.
-    
+
     GET /api/current-user/
     Requires authentication.
     """
@@ -1057,11 +1135,13 @@ def current_user_view(request):
 
 from django.shortcuts import render, redirect
 
+
 def login_page(request):
     """Render login page - always accessible"""
     # Always show the login page, even if user is authenticated
     # The frontend can show a message if already logged in
     return render(request, 'surveillance_app/login.html')
+
 
 def register_page(request):
     """Render register page - always accessible"""
