@@ -187,105 +187,56 @@ def home(request):
 # 1. GOOGLE FORMS Configuration and Utility (NEW - Replaces IFTTT)
 # ------------------------------------------------------------------
 
-# --- UPDATED GOOGLE FORMS ENTRY IDs ---
-FIELD_ID_IMAGE = "entry.1296951995"  # Alert Snapshot Image URL
-FIELD_ID_TYPE = "entry.272940768"  # Alert Type Detected (WEAPON or OVERCROWDING)
-FIELD_ID_VALUE = "entry.1032598549"  # Confidence Score / People Count
-FIELD_ID_TIME = "entry.779047139"  # Incident Timestamp
+# CORRECTED SUBMISSION URL
+# We replace '/viewform?usp=header' with '/formResponse'
+GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoEM-r0P7VNPcxbDiXDsvb87s0bX_xTX6_Tuw9XYh2g2YB2w/formResponse      "
 
-GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdSTffgdV_TPqxJ-fyRxe_gaZ9BPoyqtVpp5kwP-Iu62QmZ0w/formResponse"
+# CORRECTED ENTRY IDs
+FIELD_ID_IMAGE = "entry.194280707"  # Corresponds to Value1_Image_URL
+FIELD_ID_LABEL = "entry.1168214022"  # Corresponds to Value2_Label_Confidence
+FIELD_ID_TIME = "entry.1784554534"  # Corresponds to Value3_Timestamp
 
 # URLs for different access levels
-NGROK_URL = "https://fb8a6d4a7b29.ngrok-free.app"
+# NGROK_URL: Public URL via ngrok for Google Forms and API snapshot URLs
+NGROK_URL = "https://883b2c5fbccc.ngrok-free.app  "
+# LOCAL_URL: Local Django server URL for dashboard API calls
 LOCAL_URL = "http://127.0.0.1:8000"
 
 
 def send_google_form_alert(snapshot_relative_path, label, confidence):
     """
-    Sends alert to Google Forms with proper formatting
-
-    snapshot_relative_path: e.g., "weapon_123456.jpg"
-    label: e.g., "WEAPON_FIREARM", "WEAPON_BLADE", "WEAPON_UNKNOWN_WEAPON", "OVERCROWDING"
-    confidence: float for weapons (0.85), int for overcrowding (15)
+    Sends a POST request to Google Forms, triggering a submission
+    and thereby the form's internal email notification.
     """
-    # Skip if ngrok not configured
-    if "ngrok-free.app" not in NGROK_URL:
-        print(f"Alert suppressed: NGROK_URL = {NGROK_URL}")
-        return False
+    # Check if the Ngrok URL has been updated from the placeholder
+    if NGROK_URL.endswith("YOUR-COPIED-NGROK-URL-HERE"):
+        print("WARNING: NGROK_URL not updated. Cannot send complete alert.")
+        return
+
+    # 1. Construct the public URL for the image.
+    safe_path = urllib.parse.quote(snapshot_relative_path)
+    # Example: https://883b2c5fbccc.ngrok-free.app/media/snapshots/file.jpg
+    image_url = f"{NGROK_URL}{settings.MEDIA_URL}{safe_path}"
+
+    # 2. Prepare payload using the specific Google Form entry IDs
+    payload = {
+        FIELD_ID_IMAGE: image_url,
+        FIELD_ID_LABEL: f"{label} (Conf: {confidence:.2f})",
+        FIELD_ID_TIME: localtime(timezone.now()).strftime('%Y-%m-%d %H:%M:%S %Z'),
+    }
 
     try:
-        # 1. Construct Image URL (CRITICAL: Check this path!)
-        safe_path = urllib.parse.quote(snapshot_relative_path)
-        # IMPORTANT: Make sure MEDIA_URL is correct in settings.py
-        # Typically MEDIA_URL = '/media/'
-        image_url = f"{NGROK_URL}{settings.MEDIA_URL}{safe_path}"
+        # Send data to the form response endpoint
+        response = requests.post(GOOGLE_FORM_URL, data=payload, timeout=7)
 
-        # 2. Determine ALERT TYPE for Google Form
-        # Your form has MULTIPLE CHOICE with these exact options:
-        # - WEAPON_FIREARM (Gun detected)
-        # - WEAPON_BLADE (Knife detected)
-        # - OVERCROWDING (Too many people)
-        # - WEAPON_UNKNOWN (Unknown weapon type)
-
-        # 2. Determine ALERT TYPE for Google Form (EXACT MATCHES REQUIRED!)
-        alert_type = "WEAPON_UNKNOWN (Unknown weapon type)"  # Default with full text
-
-        if "WEAPON_FIREARM" in label:
-            alert_type = "WEAPON_FIREARM (Gun detected)"
-        elif "WEAPON_BLADE" in label:
-            alert_type = "WEAPON_BLADE (Knife detected)"
-        elif "OVERCROWDING" in label:
-            alert_type = "OVERCROWDING (Too many people)"
-
-        # 3. Format VALUE based on alert type
-        if alert_type == "OVERCROWDING":
-            # For overcrowding: send "15" or "15 people"
-            alert_value = f"{int(confidence)}"  # Just the number
+        # Google Forms usually returns 200 or 302/303 redirect if successful
+        if response.status_code in [200, 302, 303]:
+            print(f"Google Forms Alert sent successfully for {label}. Status: {response.status_code}")
         else:
-            # For weapons: send "0.85"
-            alert_value = f"{float(confidence):.2f}"
+            print(f"Google Forms Alert failed (HTTP {response.status_code}): {response.text}")
+    except requests.exceptions.RequestException as e:
+        print(f"Google Forms Alert failed due to network error: {e}")
 
-        # 4. Format timestamp
-        timestamp = localtime(timezone.now()).strftime('%Y-%m-%d %H:%M:%S')
-
-        # 5. Create payload (EXACT field names from your form)
-        payload = {
-            FIELD_ID_IMAGE: image_url,
-            FIELD_ID_TYPE: alert_type,  # MUST match options exactly
-            FIELD_ID_VALUE: alert_value,
-            FIELD_ID_TIME: timestamp,
-        }
-
-        print(f"\n SENDING GOOGLE FORM ALERT:")
-        print(f"   Alert Type: {alert_type}")
-        print(f"   Value: {alert_value}")
-        print(f"   Image: {image_url}")
-        print(f"   Time: {timestamp}")
-
-        # 6. Send to Google Forms
-        response = requests.post(
-            GOOGLE_FORM_URL,
-            data=payload,
-            timeout=10,
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        )
-
-        # Check response
-        if response.status_code == 200:
-            print(f"Alert sent successfully!")
-            return True
-        else:
-            print(f"Failed! Status: {response.status_code}")
-            print(f"   Response: {response.text[:200]}")
-            return False
-
-    except Exception as e:
-        print(f"Error sending alert: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
 
 # ------------------------------------------------------------------
 # 2. SINGLE FRAME DETECTION VIEW (Placeholder)
@@ -383,7 +334,7 @@ def generate_frames():
                b'Content-Type: image/jpeg\r\n\r\n' + error_frame + b'\r\n')
         return
 
-    # FIX: Explicitly use DirectShow backend for stability on Windows
+    # 💡 FIX: Explicitly use DirectShow backend for stability on Windows
     camera = None
     for camera_index in range(3):
         test_camera = None
@@ -531,7 +482,7 @@ def generate_frames():
                                     continue
 
                             # --- STANDARDIZE LABEL FOR LOGGING ---
-                            final_weapon_type = "UNKNOWN"
+                            final_weapon_type = "UNKNOWN_WEAPON"
                             if any(keyword in class_name for keyword in FIREARM_KEYWORDS):
                                 final_weapon_type = "FIREARM"
                             elif any(keyword in class_name for keyword in BLADE_KEYWORDS):
@@ -623,10 +574,10 @@ def generate_frames():
                             )
 
                             print(
-                                f"Logged {crowd_label} event (Log ID: {event_log.log_id}): {db_snapshot_path}, Count: {person_count}")
+                                f"✅ Logged {crowd_label} event (Log ID: {event_log.log_id}): {db_snapshot_path}, Count: {person_count}")
 
                             # --- GOOGLE FORMS ALERT TRIGGER for OVERCROWDING ---
-                            send_google_form_alert(db_snapshot_path, "OVERCROWDING", person_count)
+                            send_google_form_alert(db_snapshot_path, crowd_label, person_count)
 
                             last_crowd_alert_time = current_time
                             alert_triggered = True

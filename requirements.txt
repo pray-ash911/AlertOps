@@ -1,11 +1,17 @@
 Django
 djangorestframework
 streamlit
-ultralytics
-opencv-python
-torch
-torchvision
 Pillow
 psycopg2-binary
-numpy
 plotly
+# --- Core AI Stack (CUDA 12.1) ---
+--find-links https://download.pytorch.org/whl/cu121
+torch
+torchvision
+torchaudio
+# --- Detection & Computer Vision ---
+ultralytics
+opencv-python
+# --- Utilities ---
+numpy
+pandas

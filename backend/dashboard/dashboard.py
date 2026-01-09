@@ -32,14 +32,14 @@ st.markdown("""
     }
 
     /* Alert status (weapon detected) */
-    div[data-testid="stAlert"]:has(div:contains("")) {
+    div[data-testid="stAlert"]:has(div:contains("🚨")) {
         background: rgba(163, 0, 0, 0.2) !important;
         border-color: #ff3333 !important;
         color: #ff9999 !important;
     }
 
     /* OK/Idle status */
-    div[data-testid="stAlert"]:has(div:contains("")) {
+    div[data-testid="stAlert"]:has(div:contains("✅")) {
         background: rgba(0, 102, 255, 0.2) !important;
         border-color: #0066ff !important;
         color: #99ccff !important;
