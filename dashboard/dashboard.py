@@ -8,13 +8,13 @@ import streamlit as st
 
 st.markdown("""
 <style>
-    /* ====== MAIN DARK THEME ====== */
+    /* Main Dark Theme */
     .stApp {
         background: #0a0e27;
         color: #ffffff;
     }
 
-    /* ====== HEADERS ====== */
+    /* Headers */
     h1, h2, h3 {
         background: linear-gradient(90deg, #0066ff, #00ccff);
         -webkit-background-clip: text;
@@ -23,7 +23,7 @@ st.markdown("""
         margin-bottom: 1rem;
     }
 
-    /* ====== STATUS BANNERS ====== */
+    /* Status Banners */
     .stAlert {
         border-radius: 12px;
         border: 1px solid;
@@ -44,7 +44,7 @@ st.markdown("""
         color: #99ccff !important;
     }
 
-    /* ====== BUTTONS ====== */
+    /* Buttons */
     .stButton > button {
         background: linear-gradient(135deg, #0066ff, #00ccff);
         color: white !important;
@@ -62,7 +62,7 @@ st.markdown("""
         box-shadow: 0 15px 40px rgba(0, 102, 255, 0.4);
     }
 
-    /* ====== DATA TABLE ====== */
+    /* Data Table */
     .stDataFrame {
         background: rgba(15, 23, 42, 0.8);
         border: 1px solid rgba(0, 102, 255, 0.3);
@@ -83,20 +83,20 @@ st.markdown("""
         color: #cbd5e1 !important;
     }
 
-    /* ====== VIDEO FEED CONTAINER ====== */
+    /* Video Feed Container */
     .stMarkdown img {
         border-radius: 12px;
         border: 2px solid rgba(0, 102, 255, 0.3);
         box-shadow: 0 0 40px rgba(0, 102, 255, 0.2);
     }
 
-    /* ====== SIDEBAR ====== */
+    /* Sidebar */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0a0e27 0%, #050916 100%);
         border-right: 1px solid rgba(0, 102, 255, 0.3);
     }
 
-    /* ====== METRICS ====== */
+    /* Metrics */
     [data-testid="stMetricValue"] {
         color: #00ccff !important;
         font-size: 2rem !important;
@@ -109,7 +109,7 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* ====== TABS ====== */
+    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         background: rgba(15, 23, 42, 0.8);
         border-radius: 12px;
@@ -127,7 +127,7 @@ st.markdown("""
         color: white !important;
     }
 
-    /* ====== GRID OVERLAY EFFECT ====== */
+    /* Grid Overlay Effect */
     .stApp::before {
         content: '';
         position: fixed;
@@ -143,7 +143,7 @@ st.markdown("""
         z-index: -1;
     }
 
-    /* ====== ANIMATED BACKGROUND ====== */
+    /* Animated Background */
     .stApp::after {
         content: '';
         position: fixed;
@@ -165,17 +165,17 @@ st.markdown("""
         50% { opacity: 1; }
     }
 
-    /* ====== TEXT ELEMENTS ====== */
+    /* Text Elements */
     .stText, .stMarkdown, .stSubheader {
         color: #cbd5e1;
     }
 
-    /* ====== PROGRESS BARS ====== */
+    /* Progress Bars */
     .stProgress > div > div {
         background: linear-gradient(90deg, #0066ff, #00ccff);
     }
 
-    /* ====== EXPANDERS ====== */
+    /* Expanders */
     .streamlit-expanderHeader {
         background: rgba(0, 102, 255, 0.1);
         border: 1px solid rgba(0, 102, 255, 0.3);
@@ -183,7 +183,7 @@ st.markdown("""
         color: #00ccff;
     }
 
-    /* ====== YOUR ANALYTICS BUTTON ====== */
+    /* Analytics Button */
     a button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -206,7 +206,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# --- Configuration (UPDATE) ---
+# Configuration
 # Local Django server URL for dashboard API calls
 LOCAL_URL = "http://127.0.0.1:8000"
 # Endpoint for video feed (should be at the app level, e.g., /video_feed/)
@@ -222,7 +222,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Functions to Fetch Data ---
+# Data Fetching Functions
 def fetch_system_status():
     """Fetches the latest alert status from the Django backend API."""
     try:
@@ -279,7 +279,7 @@ def fetch_event_logs():
         return pd.DataFrame()
 
 
-# --- Dashboard Layout ---
+# Dashboard Layout
 
 # Navigation Header
 col_title, col_nav = st.columns([3, 1])
@@ -328,7 +328,7 @@ status_placeholder = st.empty()
 # Create two columns for layout
 col1, col2 = st.columns([2, 1])
 
-# --- Column 1: Live Video Feed ---
+# Column 1: Live Video Feed
 with col1:
     st.header("Live Feed")
 
@@ -338,7 +338,7 @@ with col1:
         unsafe_allow_html=True
     )
 
-# --- Column 2: Event Logs ---
+# Column 2: Event Logs
 with col2:
     st.header("Recent Event Logs")
 
@@ -355,7 +355,7 @@ if 'monitoring_active' not in st.session_state:
 
 if st.session_state['monitoring_active']:
     while True:
-        # --- A. Update System Status Banner (Polling every 2 seconds) ---
+        # Update System Status Banner (Polling every 2 seconds)
         status_data = fetch_system_status()
 
         with status_placeholder.container():
