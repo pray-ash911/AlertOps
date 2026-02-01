@@ -31,4 +31,8 @@ urlpatterns = [
     # Frontend pages
     path('login/', views.login_page, name='login_page'),
     path('register/', views.register_page, name='register_page'),
+
+    path('api/lift/process-image/', views.process_lift_image, name='process_lift_image'),
+    path('api/lift/usage-stats/', views.lift_usage_stats, name='lift_usage_stats'),
+    path('api/lift/list/', views.lift_list, name='lift_list'),
 ]

@@ -6,7 +6,6 @@ import os
 from datetime import datetime
 import streamlit as st
 
-# ====== ADD THIS AT THE VERY TOP (after imports) ======
 st.markdown("""
 <style>
     /* ====== MAIN DARK THEME ====== */
@@ -218,14 +217,12 @@ LOGS_URL = f"{LOCAL_URL}/api/logs/"
 STATUS_API_URL = f"{LOCAL_URL}/api/latest_status/"
 
 st.set_page_config(
-    page_title="AI Surveillance System Dashboard (Weapon & Overcrowding)",
+    page_title="AI Surveillance System Dashboard (Weapon And Overcrowding)",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # --- Functions to Fetch Data ---
-
-# Function to fetch latest system status
 def fetch_system_status():
     """Fetches the latest alert status from the Django backend API."""
     try:
@@ -284,7 +281,6 @@ def fetch_event_logs():
 
 # --- Dashboard Layout ---
 
-# Navigation Header
 # Navigation Header
 col_title, col_nav = st.columns([3, 1])
 with col_title:
@@ -367,19 +363,19 @@ if st.session_state['monitoring_active']:
             if status_data.get('status_level') == 'ALERT':
                 st.markdown(f"""
 <div style='background-color: #A30000; color: white; padding: 25px; border-radius: 10px; font-size: 24px; font-weight: bold; text-align: center;'>
-    🚨 💥 {status_data['message']} 💥 🚨
+    {status_data['message']} 
 </div>
 """, unsafe_allow_html=True)
 
             elif status_data.get('status_level') in ['OK', 'IDLE']:
                 st.markdown(f"""
 <div style='background-color: #2D4059; color: white; padding: 25px; border-radius: 10px; font-size: 20px; font-weight: bold; text-align: center;'>
-    ✅ {status_data['message']}
+    {status_data['message']}
 </div>
 """, unsafe_allow_html=True)
 
             else: # Error case
-                st.error(f"⚠️ {status_data['message']}")
+                st.error(f" {status_data['message']}")
 
         # --- B. Update Event Logs (Polling every 5 seconds) ---
         logs_df = fetch_event_logs()

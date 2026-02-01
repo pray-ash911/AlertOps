@@ -6,6 +6,7 @@ import requests
 import urllib.parse
 import numpy as np
 from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -17,7 +18,7 @@ from django.conf import settings
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
 # --- NEW: Import the new database models ---
-from .models import EventLog, EventType, EventEvidence, SurveillanceArea
+from .models import EventLog, EventType, EventEvidence, SurveillanceArea, Lift, LiftUsage, LiftDetection
 
 # --- REQUIRED IMPORTS AND MODEL INITIALIZATION ---
 
@@ -1197,3 +1198,544 @@ def register_page(request):
     # Always show the register page, even if user is authenticated
     # The frontend can show a message if already logged in
     return render(request, 'surveillance_app/register.html')
+
+
+
+
+# ------------------------------------------------------------------
+# 1. Helper: Get or create LiftUsage for today
+# ------------------------------------------------------------------
+def get_todays_usage(lift):
+    """Get today's usage record for a lift, create if doesn't exist"""
+    today = timezone.now().date()
+
+    usage, created = LiftUsage.objects.get_or_create(
+        lift=lift,
+        date=today,
+        defaults={
+            'usage_count': 0,
+            'total_people': 0,
+            'max_people_count': 0,
+            'overcrowding_count': 0
+        }
+    )
+
+    return usage
+
+
+
+
+# ------------------------------------------------------------------
+# Simple People Counting for Lifts
+# ------------------------------------------------------------------
+
+
+# ------------------------------------------------------------------
+# 3. API Endpoint: Upload and Process Lift Image
+# ------------------------------------------------------------------
+# ------------------------------------------------------------------
+# Simple People Counting for Lifts - CORRECTED VERSION
+# ------------------------------------------------------------------
+def count_people_in_lift(image_path, lift_config=None):
+    """
+    Simple people counting for lift images - NO AREA FILTERING
+    """
+    import cv2
+    import numpy as np
+    import time
+    import os
+
+    results = {
+        'people_count': 0,
+        'confidence': 0.0,
+        'processing_time': 0.0,
+        'detected_boxes': [],
+        'is_overcrowded': False,
+        'status': 'OK',
+        'error': None
+    }
+
+    start_time = time.time()
+
+    try:
+        # DEBUG: Check if file exists
+        if not os.path.exists(image_path):
+            results['error'] = f"Image file not found: {image_path}"
+            print(f"ERROR: {results['error']}")
+            results['processing_time'] = time.time() - start_time
+            return results
+
+        # Load image
+        img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+
+        if img is None:
+            results['error'] = "Could not load image"
+            results['processing_time'] = time.time() - start_time
+            return results
+
+        height, width = img.shape[:2]
+        print(f"DEBUG: Image dimensions: {width}x{height} pixels")
+        print(f"DEBUG: Total image area: {width * height:,} pixels")
+
+        # Check if crowd model is loaded
+        if CROWD_MODEL is None:
+            results['error'] = "Crowd detection model not loaded"
+            results['processing_time'] = time.time() - start_time
+            return results
+
+        # Run YOLO detection with lift-specific settings
+        yolo_results = CROWD_MODEL(
+            img,
+            conf=0.25,  # Lower threshold for better detection
+            iou=0.3,  # Lower NMS for crowded scenes
+            verbose=False
+        )
+
+        people_count = 0
+        total_confidence = 0.0
+        detected_boxes = []
+
+        print(f"DEBUG: YOLO returned {len(yolo_results) if yolo_results else 0} results")
+
+        if yolo_results and len(yolo_results) > 0:
+            for result_idx, result in enumerate(yolo_results):
+                boxes = result.boxes
+                if boxes is not None:
+                    print(f"DEBUG: Found {len(boxes)} total detections in result {result_idx}")
+
+                    # Show all detected classes for debugging
+                    for i, box in enumerate(boxes):
+                        cls = int(box.cls[0])
+                        conf = float(box.conf[0])
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        area = (x2 - x1) * (y2 - y1)
+
+                        class_name = "Unknown"
+                        if CROWD_MODEL.names and cls in CROWD_MODEL.names:
+                            class_name = CROWD_MODEL.names[cls]
+
+                        # Check if this is person (class 0 or based on name)
+                        is_person = False
+                        if cls == 0:  # Standard YOLO person class
+                            is_person = True
+                        elif 'person' in class_name.lower():  # Check if class name contains 'person'
+                            is_person = True
+                            print(f"DEBUG: Non-standard person class: {cls} ({class_name})")
+
+                        if is_person:
+                            # NO AREA FILTERING - Accept all person detections
+                            if conf >= 0.25:  # Only minimum confidence check
+                                people_count += 1
+                                total_confidence += conf
+
+                                detected_boxes.append({
+                                    'box': [x1, y1, x2, y2],
+                                    'confidence': conf,
+                                    'area': area,
+                                    'class_name': class_name
+                                })
+                                print(f"✓ Person {people_count}: Class={class_name}({cls}), Conf={conf:.3f}, "
+                                      f"Area={area:,}px, Box=[{x1},{y1},{x2},{y2}]")
+                            else:
+                                print(
+                                    f"✗ Low confidence person: {class_name}({cls}), Conf={conf:.3f} (threshold: 0.25)")
+                        else:
+                            # Print non-person detections for debugging
+                            print(f"  Non-person: {class_name}({cls}), Conf={conf:.3f}, Area={area:,}px")
+
+        print(f"DEBUG: Total people detected: {people_count}")
+
+        # Calculate average confidence
+        if people_count > 0:
+            avg_confidence = total_confidence / people_count
+        else:
+            avg_confidence = 0.0
+
+        results['people_count'] = people_count
+        results['detected_boxes'] = detected_boxes
+        results['confidence'] = avg_confidence
+
+        # Check overcrowding
+        if lift_config:
+            max_capacity = lift_config.max_capacity
+            results['is_overcrowded'] = people_count > max_capacity
+            results['status'] = 'OVERLOADED' if results['is_overcrowded'] else 'OK'
+        else:
+            # Default capacity
+            max_capacity = 8
+            results['is_overcrowded'] = people_count > max_capacity
+            results['status'] = 'OVERLOADED' if results['is_overcrowded'] else 'OK'
+
+        print(f"DEBUG: Max capacity: {max_capacity}, Overcrowded: {results['is_overcrowded']}")
+        print(f"DEBUG: Average confidence: {avg_confidence:.3f}")
+
+        # Create annotated image
+        if yolo_results and len(yolo_results) > 0:
+            try:
+                annotated = yolo_results[0].plot()
+
+                # Save annotated image
+                timestamp = int(time.time())
+                annotated_filename = f"lift_annotated_{timestamp}.jpg"
+                annotated_dir = os.path.join(settings.MEDIA_ROOT, 'lift_annotated')
+                os.makedirs(annotated_dir, exist_ok=True)
+                annotated_path = os.path.join(annotated_dir, annotated_filename)
+
+                success = cv2.imwrite(annotated_path, annotated)
+                if success:
+                    results['annotated_path'] = f"lift_annotated/{annotated_filename}"
+                    print(f"DEBUG: Saved annotated image: {annotated_path}")
+                else:
+                    print(f"WARNING: Failed to save annotated image")
+            except Exception as e:
+                print(f"WARNING: Could not create annotated image: {e}")
+
+        results['processing_time'] = time.time() - start_time
+        print(f"DEBUG: Processing completed in {results['processing_time']:.2f}s")
+
+    except Exception as e:
+        results['error'] = str(e)
+        print(f"ERROR in count_people_in_lift: {e}")
+        import traceback
+        traceback.print_exc()
+        results['processing_time'] = time.time() - start_time
+
+    return results
+
+
+# ------------------------------------------------------------------
+# 3. API Endpoint: Upload and Process Lift Image - FIXED
+# ------------------------------------------------------------------
+from django.views.decorators.csrf import csrf_exempt
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@csrf_exempt  # Apply csrf_exempt HERE, not in the helper function
+def process_lift_image(request):
+    """
+    Simple lift image processing - just count people
+    """
+    try:
+        # Check file
+        if 'file' not in request.FILES:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'No image file provided'
+            }, status=400)
+
+        uploaded_file = request.FILES['file']
+        lift_id = request.POST.get('lift_id')
+
+        print(
+            f"DEBUG: Received file: {uploaded_file.name}, Size: {uploaded_file.size} bytes, Content-Type: {uploaded_file.content_type}")
+
+        # Get lift configuration
+        lift = None
+        if lift_id:
+            try:
+                lift = Lift.objects.get(lift_id=lift_id, is_active=True)
+            except Lift.DoesNotExist:
+                lift = None
+
+        # Create MEDIA_ROOT directory if it doesn't exist
+        media_root = settings.MEDIA_ROOT
+        if not os.path.exists(media_root):
+            os.makedirs(media_root)
+            print(f"DEBUG: Created MEDIA_ROOT directory: {media_root}")
+
+        # Save uploaded file PROPERLY
+        timestamp = int(time.time())
+        file_ext = os.path.splitext(uploaded_file.name)[1] or '.jpg'
+        saved_filename = f"lift_{timestamp}{file_ext}"
+
+        # Create lift_detections directory
+        upload_dir = os.path.join(media_root, 'lift_detections')
+        os.makedirs(upload_dir, exist_ok=True)
+
+        # Save file - FIXED: Use proper file saving
+        saved_path = os.path.join(upload_dir, saved_filename)
+
+        print(f"DEBUG: Saving to: {saved_path}")
+
+        # Method 1: Save using Django's file handling
+        with open(saved_path, 'wb+') as destination:
+            # Read the uploaded file properly
+            for chunk in uploaded_file.chunks():
+                destination.write(chunk)
+
+        # Verify file was saved
+        if os.path.exists(saved_path):
+            file_size = os.path.getsize(saved_path)
+            print(f"DEBUG: File saved successfully. Size: {file_size} bytes")
+
+            if file_size == 0:
+                # Try alternative method if file is empty
+                print("DEBUG: File is 0 bytes, trying alternative save method...")
+                uploaded_file.seek(0)  # Reset file pointer
+                with open(saved_path, 'wb') as f:
+                    f.write(uploaded_file.read())
+
+                file_size = os.path.getsize(saved_path)
+                print(f"DEBUG: After alternative save. Size: {file_size} bytes")
+        else:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to save uploaded file'
+            }, status=500)
+
+        # Create LiftDetection instance
+        relative_path = f"lift_detections/{saved_filename}"
+        detection = LiftDetection(
+            lift=lift,
+            people_count=0,  # Will update after processing
+            confidence_score=0.0,
+            image=relative_path  # Store relative path
+        )
+        detection.save()
+
+        # Process image - WITHOUT any decorator on this function
+        results = count_people_in_lift(saved_path, lift)
+
+        # Update detection record
+        detection.people_count = results['people_count']
+        detection.confidence_score = results['confidence']
+        detection.is_overcrowded = results['is_overcrowded']
+        detection.processing_time = results['processing_time']
+        detection.detection_data = {
+            'boxes': results.get('detected_boxes', []),
+            'confidence': results['confidence'],
+            'processing_time': results['processing_time'],
+            'error': results.get('error')
+        }
+
+        if 'annotated_path' in results:
+            detection.processed_image = results['annotated_path']
+
+        detection.save()
+
+        # Update today's usage stats
+        if lift:
+            usage = get_todays_usage(lift)
+            usage.update_stats(results['people_count'])
+            detection.usage = usage
+            detection.save()
+
+        # Get image URLs
+        original_url = f"{settings.MEDIA_URL}{relative_path}"
+        processed_url = f"{settings.MEDIA_URL}{detection.processed_image}" if detection.processed_image else None
+
+        # Prepare response
+        response_data = {
+            'status': 'success',
+            'detection_id': detection.detection_id,
+            'lift': {
+                'id': lift.lift_id if lift else None,
+                'name': lift.name if lift else 'Unknown Lift',
+                'max_capacity': lift.max_capacity if lift else 8,
+                'warning_threshold': lift.warning_threshold if lift else 6
+            },
+            'results': {
+                'people_count': results['people_count'],
+                'is_overcrowded': results['is_overcrowded'],
+                'confidence': round(results['confidence'], 3),
+                'processing_time': round(results['processing_time'], 2),
+                'status': results['status'],
+                'status_color': detection.get_status_color()
+            },
+            'usage_today': {
+                'usage_count': usage.usage_count if lift else 1,
+                'total_people': usage.total_people if lift else results['people_count'],
+                'overcrowding_count': usage.overcrowding_count if lift else (1 if results['is_overcrowded'] else 0),
+                'max_people_today': usage.max_people_count if lift else results['people_count']
+            } if lift else None,
+            'images': {
+                'original': original_url,
+                'processed': processed_url
+            },
+            'debug': {
+                'saved_path': saved_path,
+                'file_size': file_size,
+                'media_root': media_root,
+                'media_url': settings.MEDIA_URL,
+                'detection_boxes_count': len(results.get('detected_boxes', [])),
+                'model_loaded': CROWD_MODEL is not None
+            },
+            'timestamp': timezone.now().isoformat()
+        }
+
+        # Add error info if present
+        if results.get('error'):
+            response_data['debug']['processing_error'] = results['error']
+
+        return JsonResponse(response_data, status=200)
+
+    except Exception as e:
+        print(f"Error in process_lift_image: {e}")
+        import traceback
+        traceback.print_exc()
+
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e),
+            'debug': {
+                'error_type': type(e).__name__,
+                'file_name': uploaded_file.name if 'uploaded_file' in locals() else 'Unknown'
+            }
+        }, status=500)
+# ------------------------------------------------------------------
+# 4. API Endpoint: Get Lift Usage Statistics
+# ------------------------------------------------------------------
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def lift_usage_stats(request):
+    """
+    Get lift usage statistics
+
+    Query Parameters:
+    - lift_id: Specific lift ID (optional)
+    - days: Number of past days (default: 7)
+    """
+    try:
+        lift_id = request.GET.get('lift_id')
+        days = int(request.GET.get('days', 7))
+
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days - 1)
+
+        # Build query
+        if lift_id:
+            lifts = Lift.objects.filter(lift_id=lift_id, is_active=True)
+        else:
+            lifts = Lift.objects.filter(is_active=True)
+
+        stats = []
+
+        for lift in lifts:
+            # Get usage for the period
+            usages = LiftUsage.objects.filter(
+                lift=lift,
+                date__range=[start_date, end_date]
+            ).order_by('date')
+
+            # Get today's usage
+            today_usage = usages.filter(date=end_date).first()
+
+            # Get detections for today
+            today_detections = LiftDetection.objects.filter(
+                lift=lift,
+                timestamp__date=end_date
+            ).order_by('-timestamp')[:10]  # Last 10 detections today
+
+            # Calculate daily averages
+            if usages.exists():
+                total_uses = sum(u.usage_count for u in usages)
+                total_people = sum(u.total_people for u in usages)
+                total_overcrowding = sum(u.overcrowding_count for u in usages)
+
+                avg_people_per_use = total_people / total_uses if total_uses > 0 else 0
+                avg_uses_per_day = total_uses / days
+                overcrowding_rate = (total_overcrowding / total_uses * 100) if total_uses > 0 else 0
+            else:
+                total_uses = 0
+                total_people = 0
+                total_overcrowding = 0
+                avg_people_per_use = 0
+                avg_uses_per_day = 0
+                overcrowding_rate = 0
+
+            # Prepare response
+            lift_stats = {
+                'lift_id': lift.lift_id,
+                'lift_name': lift.name,
+                'location': lift.location,
+                'max_capacity': lift.max_capacity,
+                'warning_threshold': lift.warning_threshold,
+
+                # Today's stats
+                'today': {
+                    'usage_count': today_usage.usage_count if today_usage else 0,
+                    'total_people': today_usage.total_people if today_usage else 0,
+                    'overcrowding_count': today_usage.overcrowding_count if today_usage else 0,
+                    'max_people': today_usage.max_people_count if today_usage else 0,
+                    'avg_people': today_usage.get_avg_people() if today_usage else 0
+                } if today_usage else None,
+
+                # Period stats
+                'period_stats': {
+                    'days': days,
+                    'total_uses': total_uses,
+                    'total_people': total_people,
+                    'total_overcrowding': total_overcrowding,
+                    'avg_people_per_use': round(avg_people_per_use, 1),
+                    'avg_uses_per_day': round(avg_uses_per_day, 1),
+                    'overcrowding_rate': round(overcrowding_rate, 1)
+                },
+
+                # Recent detections
+                'recent_detections': [
+                    {
+                        'detection_id': d.detection_id,
+                        'people_count': d.people_count,
+                        'is_overcrowded': d.is_overcrowded,
+                        'confidence': d.confidence_score,
+                        'timestamp': d.timestamp.isoformat(),
+                        'status_color': d.get_status_color()
+                    }
+                    for d in today_detections
+                ]
+            }
+
+            stats.append(lift_stats)
+
+        return JsonResponse({
+            'status': 'success',
+            'period': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'days': days
+            },
+            'stats': stats
+        }, status=200)
+
+    except Exception as e:
+        print(f"Error in lift_usage_stats: {e}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+# ------------------------------------------------------------------
+# 5. API Endpoint: Get Lift List
+# ------------------------------------------------------------------
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def lift_list(request):
+    """Get list of all active lifts"""
+    try:
+        lifts = Lift.objects.filter(is_active=True)
+
+        data = [
+            {
+                'lift_id': lift.lift_id,
+                'name': lift.name,
+                'location': lift.location,
+                'max_capacity': lift.max_capacity,
+                'warning_threshold': lift.warning_threshold,
+                'created_at': lift.created_at.isoformat()
+            }
+            for lift in lifts
+        ]
+
+        return JsonResponse({
+            'status': 'success',
+            'count': len(data),
+            'lifts': data
+        }, status=200)
+
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
