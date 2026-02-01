@@ -178,7 +178,6 @@ st.markdown(f"""
     <div style="display: flex; align-items: center; gap: 15px;">
         <img src="{LOCAL_URL}/static/images/img_5.png" 
              style="width: 130px; height: 130px; border-radius: 10px; 
-                    box-shadow: 0 0 15px rgba(0, 102, 255, 0.3); 
                     border: 1px solid rgba(0, 102, 255, 0.2);">
         <h1 class="main-header">
             Lift Capacity Monitoring System
