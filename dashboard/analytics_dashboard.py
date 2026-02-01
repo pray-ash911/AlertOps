@@ -1,4 +1,5 @@
-# dashboard.py
+
+# Dashboard Imports
 import streamlit as st
 import requests
 import pandas as pd
@@ -9,16 +10,19 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import json
 
-# Custom CSS - Dark Cyber Security Theme
+
+# Custom CSS Configuration
 st.markdown("""
 <style>
-    /* ====== MAIN BACKGROUND ====== */
+
+    # Main Background App Style
     .stApp {
         background: #0a0e27;
         color: #ffffff;
     }
 
-    /* ====== HEADERS ====== */
+
+    # Header Styles
     .main-header {
         font-size: 2.8rem;
         font-weight: 700;
@@ -44,7 +48,8 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* ====== METRIC CARDS ====== */
+
+    # Metric Card Styles
     .metric-card {
         background: rgba(15, 23, 42, 0.8);
         backdrop-filter: blur(10px);
@@ -92,7 +97,8 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* ====== SIDEBAR ====== */
+
+    # Sidebar Styling
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0a0e27 0%, #050916 100%);
         border-right: 1px solid rgba(0, 102, 255, 0.3);
@@ -107,7 +113,8 @@ st.markdown("""
         color: #cbd5e1 !important;
     }
 
-    /* ====== BUTTONS ====== */
+
+    # Button Styles
     .stButton > button {
         background: linear-gradient(135deg, #0066ff, #00ccff);
         color: white !important;
@@ -126,7 +133,8 @@ st.markdown("""
         box-shadow: 0 15px 40px rgba(0, 102, 255, 0.4);
     }
 
-    /* ====== INFO BOXES ====== */
+
+    # Info Box Styles
     .info-box {
         background: rgba(0, 102, 255, 0.1);
         padding: 1.5rem;
@@ -137,7 +145,8 @@ st.markdown("""
         backdrop-filter: blur(10px);
     }
 
-    /* ====== DATA TABLES ====== */
+
+    # Data Table Styles
     .stDataFrame {
         background: rgba(15, 23, 42, 0.8);
         border: 1px solid rgba(0, 102, 255, 0.3);
@@ -145,7 +154,7 @@ st.markdown("""
         color: white;
     }
 
-    /* Table headers */
+
     .stDataFrame th {
         background: rgba(0, 102, 255, 0.3) !important;
         color: #00ccff !important;
@@ -154,14 +163,15 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* Table cells */
+
     .stDataFrame td {
         background: rgba(15, 23, 42, 0.6) !important;
         color: #cbd5e1 !important;
         border-bottom: 1px solid rgba(0, 102, 255, 0.1) !important;
     }
 
-    /* ====== TABS ====== */
+
+    # Tab Styles
     .stTabs [data-baseweb="tab-list"] {
         background: rgba(15, 23, 42, 0.8);
         border-radius: 12px;
@@ -181,7 +191,8 @@ st.markdown("""
         color: white !important;
     }
 
-    /* ====== METRICS ====== */
+
+    # Metrics Styles
     [data-testid="stMetricValue"] {
         color: #00ccff !important;
         font-size: 2rem !important;
@@ -196,12 +207,14 @@ st.markdown("""
         font-size: 0.9rem !important;
     }
 
-    /* ====== TEXT ELEMENTS ====== */
+
+    # General Text Styles
     .stText, .stMarkdown, p, div, span {
         color: #cbd5e1 !important;
     }
 
-    /* ====== BADGES ====== */
+
+    # Badge Styles
     .alert-badge {
         display: inline-block;
         padding: 0.5rem 1rem;
@@ -224,7 +237,8 @@ st.markdown("""
         border: 1px solid rgba(16, 185, 129, 0.4);
     }
 
-    /* ====== HOUR STAT BOXES ====== */
+
+    # Hourly Stat Box Styles
     .hour-stat-box {
         background: rgba(15, 23, 42, 0.8);
         padding: 1rem;
@@ -233,7 +247,8 @@ st.markdown("""
         border: 1px solid rgba(0, 102, 255, 0.2);
     }
 
-    /* ====== ANIMATED BACKGROUND EFFECTS ====== */
+
+    # Animated Background Effects
     .stApp::before {
         content: '';
         position: fixed;
@@ -249,7 +264,8 @@ st.markdown("""
         z-index: -1;
     }
 
-    /* ====== RADIO BUTTONS ====== */
+
+    # Radio Button Styles
     .stRadio > div {
         background: rgba(15, 23, 42, 0.8);
         padding: 10px;
@@ -257,7 +273,8 @@ st.markdown("""
         border: 1px solid rgba(0, 102, 255, 0.2);
     }
 
-    /* ====== SLIDERS ====== */
+
+    # Slider Styles
     .stSlider > div > div {
         background: linear-gradient(90deg, #0066ff, #00ccff);
     }
@@ -266,12 +283,14 @@ st.markdown("""
         color: #cbd5e1;
     }
 
-    /* ====== CHECKBOXES ====== */
+
+    # Checkbox Styles
     .stCheckbox > label {
         color: #cbd5e1;
     }
 
-    /* ====== SECTION HEADERS ====== */
+
+    # Section Header Styles
     .section-header {
         font-size: 1.2rem;
         font-weight: 600;
@@ -283,7 +302,8 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* ====== ALIGNMENT ====== */
+
+    # Alignment Utilities
     .left-align {
         text-align: left !important;
     }
@@ -292,11 +312,13 @@ st.markdown("""
         text-align: right !important;
     }
 
-    /* ====== ANIMATIONS ====== */
+
+    # Animation Keyframes
     @keyframes pulse {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.8; }
     }
+
     /* Remove bright blue from all Streamlit widgets */
     div[data-testid="stSlider"] > div > div,
     div[data-testid="stRadio"] > div,
@@ -315,7 +337,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Set page config
+
+# Page Configuration
 st.set_page_config(
     page_title="AI Surveillance Analytics Dashboard",
     layout="wide",
@@ -323,11 +346,13 @@ st.set_page_config(
     page_icon=""
 )
 
-# Configuration
+
+# Application Constants
 LOCAL_URL = "http://127.0.0.1:8000"
 ANALYTICS_URL = f"{LOCAL_URL}/api/analytics/"
 
-# Title with Logo
+
+# Main Title and Logo Representation
 st.markdown(f"""
 <div style="margin-bottom: 2rem;">
     <div style="display: flex; align-items: center; gap: 20px; margin: 0 0 10px 1rem;">
@@ -342,18 +367,21 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
 # Sidebar Configuration
 st.sidebar.header("Dashboard Configuration")
 st.sidebar.markdown("---")
 
-# Data source selection
+
+# Data Source Selection
 data_source = st.sidebar.radio(
     "Data Source:",
     ["Live API"],
     index=0
 )
 
-# Date range in sidebar
+
+# Date Range Configuration
 st.sidebar.header("Analysis Period")
 days_back = st.sidebar.slider(
     "Days to analyze:",
@@ -363,17 +391,20 @@ days_back = st.sidebar.slider(
     step=1
 )
 
-# Event type filter
+
+# Event Filters
 st.sidebar.header("Event Type Filter")
 show_weapons = st.sidebar.checkbox("Show Weapon Detections", value=True)
 show_crowd = st.sidebar.checkbox("Show Overcrowding Events", value=True)
 
-# Chart settings
+
+# Chart Visualization Configuration
 st.sidebar.header("Chart Settings")
 chart_height = st.sidebar.slider("Chart Height", 300, 600, 400)
 
-# Refresh button
+
 st.sidebar.markdown("---")
+# Data Refresh Control
 if st.sidebar.button("Refresh Data", width='stretch'):
     st.rerun()
 
@@ -388,8 +419,9 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 
-# Fetch data function
+
 @st.cache_data(ttl=300)  # Cache for 5 minutes
+# Data Fetching Function
 def fetch_analytics_data():
     try:
         response = requests.get(ANALYTICS_URL, timeout=10)
@@ -403,7 +435,8 @@ def fetch_analytics_data():
         return None
 
 
-# Load data
+
+# Data Loading Logic
 if data_source == "Live API":
     with st.spinner("Fetching data from API..."):
         data = fetch_analytics_data()
@@ -412,29 +445,33 @@ if data_source == "Live API":
         st.warning("Could not connect to API. Using sample data.")
         data_source = "Sample Data"
 
+# Sample Data Generation Fallback
 if data_source == "Sample Data" or data is None:
-    # Generate comprehensive sample data
+    
+    # Generate comprehensive sample data for visualization
     dates = pd.date_range(end=datetime.now(), periods=days_back, freq='D')
     analytics_data = []
 
     for i, date in enumerate(dates):
-        # Create realistic patterns
+        # Create realistic patterns based on day of week
+        
         day_of_week = date.weekday()
 
-        # Weekends have more events
-        if day_of_week >= 5:  # Saturday, Sunday
+        
+        if day_of_week >= 5:  # Saturday, Sunday having more events
             weapon = np.random.poisson(lam=2.5)
             crowd = np.random.poisson(lam=8)
-        # Fridays moderate-high
-        elif day_of_week == 4:  # Friday
+        
+        elif day_of_week == 4:  # Friday moderate-high activity
             weapon = np.random.poisson(lam=2.0)
             crowd = np.random.poisson(lam=6)
-        # Weekdays
-        else:
+        
+        else:  # Regular weekday patterns
             weapon = np.random.poisson(lam=1.2)
             crowd = np.random.poisson(lam=4)
 
-        # Add some trend/pattern
+        
+        # Add trend patterns for recent days
         if i > days_back * 0.7:  # Recent days have more activity
             weapon = min(weapon + np.random.randint(0, 2), 5)
             crowd = min(crowd + np.random.randint(0, 3), 12)
@@ -446,7 +483,8 @@ if data_source == "Sample Data" or data is None:
             'total_detections': int(weapon + crowd)
         })
 
-    # Create sample data structure
+    
+    # Structuring the final data dictionary
     data = {
         'daily_analytics': analytics_data,
         'hourly_analytics': [
@@ -472,7 +510,8 @@ if data_source == "Sample Data" or data is None:
         }
     }
 
-# Convert to DataFrames
+
+# Data Processing for Visualization
 daily_df = pd.DataFrame(data['daily_analytics'])
 daily_df['date'] = pd.to_datetime(daily_df['date'])
 daily_df['day_of_week'] = daily_df['date'].dt.day_name()
@@ -481,7 +520,8 @@ daily_df['month'] = daily_df['date'].dt.strftime('%Y-%m')
 
 hourly_df = pd.DataFrame(data['hourly_analytics'])
 
-# Display data source info
+
+# Display Data Source Verification
 source_info = "Sample Data" if data_source == "Sample Data" else "Live API Data"
 st.markdown(f"""
 <div class="info-box">
@@ -489,7 +529,8 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Row 1: Key Metrics
+
+# Key Performance Indicators Section
 st.markdown('<h2 class="sub-header">Key Performance Indicators</h2>', unsafe_allow_html=True)
 
 col1, col2, col3, col4, col5, col6 = st.columns(6)
@@ -566,13 +607,15 @@ with col6:
     </div>
     """, unsafe_allow_html=True)
 
-# Row 2: Daily Trends
+
+# Daily Trends Analysis Section
 st.markdown('<h2 class="sub-header">Daily Trends Analysis</h2>', unsafe_allow_html=True)
 
 tab1, tab2, tab3 = st.tabs(["Daily Chart", "Comparison View", "Statistics"])
 
 with tab1:
-    # Bar chart for daily trends
+    
+    # Daily Trends Bar Chart
     fig_daily = go.Figure()
 
     if show_weapons and 'weapon' in daily_df.columns:
@@ -618,7 +661,8 @@ with tab1:
         title_font=dict(color='#00ccff', size=20)
     )
 
-    # Add grid
+    
+    # Configure Grid Layout
     fig_daily.update_xaxes(
         showgrid=True,
         gridwidth=1,
@@ -638,7 +682,8 @@ with tab2:
     col1, col2 = st.columns(2)
 
     with col1:
-        # Stacked area chart
+        
+        # Area Chart Visualization
         fig_area = go.Figure()
 
         if show_weapons and 'weapon' in daily_df.columns:
@@ -681,10 +726,12 @@ with tab2:
         st.plotly_chart(fig_area, width='stretch')
 
     with col2:
-        # Bar chart for comparison
+        
+        # Comparison Bar Chart
         fig_bar = go.Figure()
 
-        # Show last 14 days for better visibility
+        
+        # Focusing on the last 14 days
         recent_df = daily_df.tail(14)
 
         if show_weapons:
@@ -755,16 +802,19 @@ with tab3:
             st.metric("Highest Alert Day", f"{daily_df['total_detections'].max():.0f}")
             st.metric("Alert-Free Days", f"{(daily_df['total_detections'] == 0).sum():.0f}")
 
-# Row 3: Hourly Patterns
+
+# Hourly Activity Patterns Section
 st.markdown('<h2 class="sub-header">Hourly Activity Patterns</h2>', unsafe_allow_html=True)
 
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    # Hourly bar chart with dual y-axis
+    
+    # Hourly Analysis Chart with Dual Axis
     fig_hourly = go.Figure()
 
-    # Create secondary y-axis for weapons
+    
+    # Adding secondary axis support
     fig_hourly = make_subplots(specs=[[{"secondary_y": True}]])
 
     if show_weapons:
@@ -793,7 +843,8 @@ with col1:
             secondary_y=True,
         )
 
-    # Set x-axis properties
+    
+    # X-Axis Configuration
     fig_hourly.update_xaxes(
         title_text="Hour of Day",
         tickmode='array',
@@ -803,7 +854,8 @@ with col1:
         linecolor='rgba(0, 102, 255, 0.3)'
     )
 
-    # Set y-axes properties
+    
+    # Y-Axis Configuration
     fig_hourly.update_yaxes(
         title_text="Weapon Detections",
         secondary_y=False,
@@ -844,7 +896,8 @@ with col1:
     st.plotly_chart(fig_hourly, width='stretch')
 
 with col2:
-    # Top Weapon Hours - Left aligned
+    
+    # Top Weapon Hours Display
     if show_weapons and 'weapon' in hourly_df.columns:
         st.markdown('<h3 class="left-align" style="color: #ff6666;">Top Weapon Hours</h3>', unsafe_allow_html=True)
         top_weapon_hours = hourly_df.nlargest(3, 'weapon')[['hour', 'weapon']]
@@ -860,7 +913,8 @@ with col2:
             st.markdown(f"<div style='height: 1px; background-color: rgba(0, 102, 255, 0.2); margin: 0.5rem 0;'></div>",
                         unsafe_allow_html=True)
 
-    # Top Crowd Hours - Left aligned
+    
+    # Top Crowd Hours Display
     if show_crowd and 'overcrowding' in hourly_df.columns:
         st.markdown('<h3 class="left-align" style="color: #6ee7b7;">Top Crowd Hours</h3>', unsafe_allow_html=True)
         top_crowd_hours = hourly_df.nlargest(3, 'overcrowding')[['hour', 'overcrowding']]
@@ -876,7 +930,8 @@ with col2:
             st.markdown(f"<div style='height: 1px; background-color: rgba(0, 102, 255, 0.2); margin: 0.5rem 0;'></div>",
                         unsafe_allow_html=True)
 
-    # Hourly Summary - Aligned left/right
+    
+    # Hourly Activity Summary
     st.markdown('<h3 class="left-align" style="color: #00ccff;">Hourly Summary</h3>', unsafe_allow_html=True)
 
     if show_weapons:
@@ -903,13 +958,15 @@ with col2:
         st.markdown(f"<div style='height: 1px; background-color: rgba(0, 102, 255, 0.2); margin: 0.5rem 0;'></div>",
                     unsafe_allow_html=True)
 
-# Row 4: Weekly and Monthly Analysis
+
+# Weekly and Monthly Pattern Analysis
 st.markdown('<h2 class="sub-header">Weekly And Monthly Patterns</h2>', unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 
 with col1:
-    # Weekly aggregation
+    
+    # Weekly Data Aggregation
     weekly_stats = daily_df.groupby('day_of_week').agg({
         'weapon': 'mean',
         'overcrowding': 'mean',
@@ -954,7 +1011,8 @@ with col1:
     st.plotly_chart(fig_weekly, use_container_width=True)
 
 with col2:
-    # Monthly aggregation (if we have enough data)
+    # Monthly Data Aggregation
+    
     if len(daily_df) > 30:
         monthly_stats = daily_df.groupby('month').agg({
             'weapon': 'sum',
@@ -999,10 +1057,12 @@ with col2:
 
         st.plotly_chart(fig_monthly, use_container_width=True)
     else:
-        # Show distribution pie chart
+        
+        # Event Distribution Pie Chart Fallback
         st.markdown("### Event Distribution")
 
-        # Calculate percentages
+        
+        # Calculate summary statistics
         total_weapons = data['summary']['total_weapons']
         total_crowd = data['summary']['total_overcrowding']
 
@@ -1025,24 +1085,28 @@ with col2:
 
         st.plotly_chart(fig_pie, use_container_width=True)
 
-# Row 5: Recent Events & Data Export
+
+# Recent Events and Export Section
 st.markdown('<h2 class="sub-header">Recent Events and Data</h2>', unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["Recent Events", "Export Data"])
 
 with tab1:
-    # Display recent events if available
+    
+    # Recent Events Table
     if 'recent_events' in data and data['recent_events']:
         recent_events_df = pd.DataFrame(data['recent_events'])
 
-        # Format the DataFrame for display
+        
+        # Prepare DataFrame for Display
         display_df = recent_events_df.copy()
         if 'timestamp' in display_df.columns:
             display_df['timestamp'] = pd.to_datetime(display_df['timestamp'])
             display_df['Date'] = display_df['timestamp'].dt.strftime('%Y-%m-%d')
             display_df['Time'] = display_df['timestamp'].dt.strftime('%H:%M:%S')
 
-        # Select and order columns
+        
+        # Filter and Rename Columns
         columns_to_show = []
         if 'Date' in display_df.columns:
             columns_to_show.append('Date')
@@ -1094,7 +1158,7 @@ with tab2:
     with col2:
         st.markdown("### Export Options")
 
-        # Convert DataFrames to CSV
+        # Convert DataFrames to CSV for Download
         daily_csv = daily_df.to_csv(index=False)
         hourly_csv = hourly_df.to_csv(index=False)
 
@@ -1114,7 +1178,7 @@ with tab2:
             use_container_width=True
         )
 
-        # Export as JSON
+        # Export Full Data as JSON
         json_data = json.dumps(data, indent=2)
         st.download_button(
             label="Download Full Data (JSON)",
@@ -1124,7 +1188,8 @@ with tab2:
             use_container_width=True
         )
 
-# Footer
+
+# Dashboard Footer
 st.markdown("---")
 col1, col2, col3 = st.columns([1, 2, 1])
 
@@ -1142,5 +1207,6 @@ with col3:
     if st.button("Refresh Now", use_container_width=True):
         st.rerun()
 
-# Add some spacing
+
+# Bottom Spacing
 st.markdown("<br><br>", unsafe_allow_html=True)

@@ -346,7 +346,7 @@ with col2:
     log_container = st.empty()
 
 
-# --- Main Polling Loop for Dynamic Updates ---
+# Main Polling Loop for Dynamic Updates
 if st.button("Start/Restart System Status Monitoring"):
     st.session_state['monitoring_active'] = True
 
@@ -377,7 +377,7 @@ if st.session_state['monitoring_active']:
             else: # Error case
                 st.error(f" {status_data['message']}")
 
-        # --- B. Update Event Logs (Polling every 5 seconds) ---
+        # B. Update Event Logs (Polling every 5 seconds)
         logs_df = fetch_event_logs()
 
         with log_container.container():

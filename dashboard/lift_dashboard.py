@@ -8,7 +8,6 @@ import plotly.express as px
 import time
 from PIL import Image
 import io
-
 import pytz
 
 # Set your timezone here
