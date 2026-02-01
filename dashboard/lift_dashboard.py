@@ -1,4 +1,4 @@
-# lift_dashboard.py - CLEAN VERSION
+# lift_dashboard.py
 import streamlit as st
 import requests
 import pandas as pd
@@ -176,7 +176,7 @@ if 'processing' not in st.session_state:
 st.markdown(f"""
 <div style="margin-bottom: 2rem;">
     <div style="display: flex; align-items: center; gap: 15px;">
-        <img src="{LOCAL_URL}/static/images/img_4.png" 
+        <img src="{LOCAL_URL}/static/images/img_5.png" 
              style="width: 130px; height: 130px; border-radius: 10px; 
                     box-shadow: 0 0 15px rgba(0, 102, 255, 0.3); 
                     border: 1px solid rgba(0, 102, 255, 0.2);">
@@ -189,7 +189,15 @@ st.markdown(f"""
 
 
 def create_metric_card(label, value, delta=None, status_class=""):
-    """Create a metric card with label and value"""
+    """
+        Render a styled metric card in the Streamlit UI
+
+        Query Parameters:
+        - label: The descriptive text for the metric
+        - value: The primary numerical or text value to display
+        - delta: Optional secondary information or trend text (default: None)
+        - status_class: CSS class for conditional styling (e.g., status-danger)
+        """
     delta_html = f'<div style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.5rem;">{delta}</div>' if delta else ''
     st.markdown(f"""
     <div class="metric-card {status_class}">
@@ -202,7 +210,7 @@ def create_metric_card(label, value, delta=None, status_class=""):
 
 # Sidebar Configuration
 with st.sidebar:
-    st.markdown("## Configuration Panel")
+    st.markdown("Configuration Panel")
     st.markdown("---")
 
     # Fetch lifts from API
@@ -236,7 +244,7 @@ with st.sidebar:
     st.markdown("---")
 
     # Quick stats
-    st.markdown("### Today's Statistics")
+    st.markdown("Today's Statistics")
     try:
         response = requests.get(
             f"{API_URL}/api/lift/usage-stats/?lift_id={lift_id}&days=1",
@@ -280,7 +288,7 @@ with tab1:
     col1, col2 = st.columns([3, 2])
 
     with col1:
-        st.markdown("### Upload Lift Image")
+        st.markdown("Upload Lift Image")
 
         uploaded_file = st.file_uploader(
             "Select image file",
@@ -373,7 +381,7 @@ with tab1:
             """, unsafe_allow_html=True)
 
     with col2:
-        st.markdown("### Detection Results")
+        st.markdown("Detection Results")
 
         if st.session_state.last_result:
             result = st.session_state.last_result
@@ -423,7 +431,7 @@ with tab1:
                 )
 
             # Occupancy gauge
-            st.markdown("### Capacity Analysis")
+            st.markdown("Capacity Analysis")
             occupancy_rate = min(people_count / max_capacity, 1.0) * 100
 
             fig = go.Figure(go.Indicator(
@@ -676,7 +684,7 @@ with tab2:
                             st.plotly_chart(fig_hourly, use_container_width=True)
 
                             # Show hourly statistics
-                            st.markdown("**Hourly Statistics:**")
+                            st.markdown("Hourly Statistics:**")
                             col_h1, col_h2, col_h3 = st.columns(3)
                             with col_h1:
                                 peak_hour = hourly_stats.loc[hourly_stats['avg_people'].idxmax()]
